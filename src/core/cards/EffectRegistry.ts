@@ -5,8 +5,21 @@
 // Handlers never touch DuelState directly for mutations: they use ctx.ops so
 // the engine can emit events, keep the log and check win conditions.
 //
-// Wave 2 (Card Designer): add new handlers in src/core/cards/effects/*.ts and
-// import them from src/core/cards/effects/index.ts (the engine imports that file).
+// Card-specific handlers live in src/core/cards/effects/*.ts and are imported
+// from src/core/cards/effects/index.ts (the engine imports that file).
+//
+// Hook overview (who gets called):
+//  - Spells/traps: onActivate / onAttackDeclared / onSummon when they resolve;
+//    statMod / canAttack / canChangePosition / protects / onTurnEnd while FACE-UP on the field.
+//  - Monsters: statMod / canAttack / canChangePosition / protects while FACE-UP on the field;
+//    onSelfSummon when summoned face-up (ctx.summon.how says normal/flip/special);
+//    onIgnition via the 'activateMonster' action; modifyBattle / afterBattle when the monster
+//    took part in a battle (face-up); tributeValue when it is tributed.
+//  - Turn-scoped effects (Waboku, Negate Attack) set PlayerState.flags via ops.setFlag.
+//
+// Arena convention: an `arenaUsable` spell's arena behaviour is `arenaAbilities[0]` on its
+// CardDef, with cooldown 0 meaning one-shot. Firing it in the arena consumes the card (it goes
+// to the GY via ArenaResult.spellsUsed) and its duel effect does NOT resolve.
 import type {
   CardDef, CardInstance, DuelState, MonsterSlot, PlayerId, Position,
 } from '../types';
@@ -15,7 +28,8 @@ export type EffectTrigger =
   | 'activate'        // manual activation from hand or from a Set zone
   | 'attackDeclared'  // opponent declared an attack (traps)
   | 'summon'          // a monster was Normal Summoned (traps like Trap Hole)
-  | 'selfSummon';     // this monster itself was summoned face-up
+  | 'selfSummon'      // this monster itself was summoned face-up
+  | 'ignition';       // a face-up monster's activated effect ('activateMonster' action)
 
 export interface AttackInfo {
   attackerUid: number;
@@ -28,6 +42,23 @@ export interface SummonInfo {
   uid: number;
   player: PlayerId;
   faceDown: boolean;
+  /** How the monster arrived (set for selfSummon contexts). */
+  how?: 'normal' | 'flip' | 'special';
+}
+
+/** Battle outcome after an arena fight, passed to modifyBattle (mutable) and afterBattle. */
+export interface BattleInfo {
+  attackerUid: number;
+  attackerPlayer: PlayerId;
+  /** null for a direct attack (afterBattle only). */
+  defenderUid: number | null;
+  defenderPlayer: PlayerId;
+  attackerAtk: number;
+  defenderAtk: number;
+  defenderDef: number;
+  defenderPosition: Position;
+  /** Mutable in modifyBattle. lpDamage = [to attacking player, to defending player]. */
+  outcome: { attackerDestroyed: boolean; defenderDestroyed: boolean; lpDamage: [number, number] };
 }
 
 /** Mutating helpers provided by the engine. All emit DuelEvents + log lines. */
@@ -47,6 +78,21 @@ export interface EffectOps {
   specialSummonFromHand(player: PlayerId, uid: number, position?: Position): boolean;
   /** During onAttackDeclared: stop the current attack (it still counts as the monster's attack). */
   negateAttack(): void;
+  /** End the active player's Battle Phase: no more attacks this turn. */
+  endBattlePhase(): void;
+  /** ATK modifier that expires at the end of the turn. */
+  modifyAtkTemp(uid: number, delta: number): void;
+  /** Change a monster's battle position (face-up). Emits a 'position' event. No flip effects. */
+  setPosition(uid: number, position: Position): void;
+  /** Turn a face-down monster face-up (keeps its position). No flip effects. */
+  flipFaceUp(uid: number): void;
+  /** Counters on a monster or spell/trap on the field. */
+  getCounters(uid: number): number;
+  setCounters(uid: number, n: number): void;
+  /** Set a turn-scoped flag on a player (active while state.turn === untilTurn). */
+  setFlag(player: PlayerId, key: string, untilTurn: number): void;
+  /** Special Summon a monster from EITHER graveyard under `controller`'s control. */
+  specialSummonFromAnyGY(controller: PlayerId, uid: number, position?: Position): boolean;
   log(text: string): void;
   /** Deterministic RNG for effects. */
   random(): number;
@@ -102,9 +148,22 @@ export interface EffectHandler {
    * field (equip / continuous / field spells). Called for every monster on the field.
    */
   statMod?(ctx: EffectContext, target: StatModTarget): { atk?: number; def?: number } | null;
-  // TODO(arena): arenaSpellEffect metadata — how an arenaUsable spell behaves when
-  // fired during an arena fight (e.g. { kind: 'aoe', power: 2 }). Owned by Arena Dev.
-  arenaSpellEffect?: unknown;
+  /** Monster ignition effect (action 'activateMonster'); uses canActivate/getTargets with trigger 'ignition'. */
+  onIgnition?(ctx: EffectContext): void;
+  /** While face-up on the field: return false to forbid `attackerUid` from declaring an attack. */
+  canAttack?(ctx: EffectContext, attackerUid: number): boolean;
+  /** While face-up on the field: return false to forbid changing `uid`'s battle position. */
+  canChangePosition?(ctx: EffectContext, uid: number): boolean;
+  /** While face-up on the field: return true if card effects cannot target the field monster `targetUid`. */
+  protects?(ctx: EffectContext, targetUid: number): boolean;
+  /** Face-up spells/traps: called at the end of every turn (ctx.state.activePlayer = player ending). */
+  onTurnEnd?(ctx: EffectContext): void;
+  /** Battle participant (face-up): adjust the outcome before it is applied. */
+  modifyBattle?(ctx: EffectContext, b: BattleInfo): void;
+  /** Battle participant still on the field after the battle (also after direct attacks). */
+  afterBattle?(ctx: EffectContext, b: BattleInfo): void;
+  /** How many tributes this monster counts as when tributed for `summoning` (default 1). */
+  tributeValue?(ctx: EffectContext, summoning: CardDef): number;
 }
 
 const handlers = new Map<string, EffectHandler>();
@@ -185,6 +244,12 @@ registerEffect('destroyTargetMonster', {
   },
 });
 
+/** Parse a comma-separated list param ("Spellcaster,Dragon") into trimmed entries. */
+export function listParam(ctx: EffectContext, key: string): string[] {
+  const v = ctx.params[key];
+  return typeof v === 'string' ? v.split(',').map((x) => x.trim()).filter(Boolean) : [];
+}
+
 /**
  * 'equipAtk' {atk, def, types?}: equip spell; target any face-up monster
  * (optionally only of the comma-separated MonsterTypes in `types`).
@@ -218,10 +283,13 @@ registerEffect('destroyAttacker', {
   },
 });
 
-/** 'negateAttack' (Negate Attack-like trap): stop the attack. */
+/** 'negateAttack' {endBattlePhase?} (Negate Attack): stop the attack, optionally end the Battle Phase. */
 registerEffect('negateAttack', {
   canActivate: (ctx) => ctx.trigger === 'attackDeclared' && !!ctx.attack,
-  onAttackDeclared: (ctx) => ctx.ops.negateAttack(),
+  onAttackDeclared: (ctx) => {
+    ctx.ops.negateAttack();
+    if (ctx.params.endBattlePhase) ctx.ops.endBattlePhase();
+  },
 });
 
 /** 'destroyAttackPosition' (Mirror Force-like trap): destroy all opponent attack-position monsters. */
@@ -245,7 +313,7 @@ registerEffect('destroySummoned', {
   },
 });
 
-function findSpellTrapSlot(state: Readonly<DuelState>, uid: number) {
+export function findSpellTrapSlot(state: Readonly<DuelState>, uid: number) {
   for (const p of state.players) {
     for (const s of p.spellTraps) if (s && s.card.uid === uid) return s;
   }

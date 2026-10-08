@@ -87,13 +87,21 @@ export interface MonsterSlot {
   changedPositionThisTurn: boolean;
   atkMod: number;
   defMod: number;
+  /** [effects addition] ATK modifier that expires at the end of the current turn (Rush Recklessly). */
+  tempAtkMod?: number;
+  /** [effects addition] generic counters on this monster (Breaker's Spell Counter). */
+  counters?: number;
 }
 
 export interface SpellTrapSlot {
   card: CardInstance;
   faceDown: boolean;
   setThisTurn: boolean;
-  equippedTo?: number; // uid of monster
+  /** uid of the monster this card is attached to: an equip spell's target, or a targeted
+   *  continuous card such as Spellbinding Circle. It is destroyed when that monster leaves the field. */
+  equippedTo?: number;
+  /** [effects addition] generic counters on this card (Swords of Revealing Light: opponent turns left). */
+  counters?: number;
 }
 
 export interface PlayerState {
@@ -105,6 +113,11 @@ export interface PlayerState {
   monsters: (MonsterSlot | null)[];   // 5 zones
   spellTraps: (SpellTrapSlot | null)[]; // 5 zones
   normalSummonUsed: boolean;
+  /**
+   * [effects addition] turn-scoped flags: key -> the turn number during which the flag is active.
+   * Known keys: 'noBattleDamage', 'battleIndestructible' (Waboku), 'battleEnded' (Negate Attack).
+   */
+  flags?: Record<string, number>;
 }
 
 export interface DuelState {
@@ -129,6 +142,8 @@ export type DuelAction =
   | { type: 'changePosition'; uid: number }
   | { type: 'enterBattle' }
   | { type: 'declareAttack'; attackerUid: number; targetUid: number | null } // null = direct
+  /** [effects addition] ignition effect of a face-up monster you control (Breaker the Magical Warrior). */
+  | { type: 'activateMonster'; uid: number; targetUid?: number }
   /** [engine addition] discardUids: cards to discard for the hand limit (else the engine discards highest-index cards). */
   | { type: 'endTurn'; discardUids?: number[] };
 

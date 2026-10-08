@@ -26,6 +26,8 @@ export function describeAction(state: Readonly<DuelState>, a: DuelAction): strin
     case 'enterBattle': return 'Battle Phase';
     case 'declareAttack':
       return `${name(state, a.attackerUid)} attacks ${a.targetUid === null ? 'directly' : name(state, a.targetUid)}`;
+    case 'activateMonster':
+      return `Effect of ${name(state, a.uid)}${a.targetUid !== undefined ? ` -> ${name(state, a.targetUid)}` : ''}`;
     case 'endTurn': return 'End Turn';
   }
 }

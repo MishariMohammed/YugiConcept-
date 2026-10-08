@@ -157,7 +157,8 @@ console.log(`\n${cards.length} cards (${kinds.monster} monsters, ${kinds.spell} 
 const effectIds = [...new Set(cards.map((c) => c.effect?.id).filter(Boolean))].sort();
 console.log(`effect ids (${effectIds.length}): ${effectIds.join(', ')}`);
 const missing = effectIds.filter((id) => !hasEffect(id!));
-if (missing.length) console.log(`effect ids not yet registered in EffectRegistry (${missing.length}): ${missing.join(', ')}`);
+console.log(`unregistered effect ids: ${missing.length}${missing.length ? ` (${missing.join(', ')})` : ''}`);
+for (const id of missing) errors.push(`effect id "${id}" is not registered in EffectRegistry`);
 
 for (const w of warnings) console.warn(`WARN  ${w}`);
 if (errors.length) {

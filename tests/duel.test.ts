@@ -423,11 +423,13 @@ describe('real card data + random playouts', () => {
         e.apply(r.next() < 0.15 ? end : r.pick(acts));
       }
       expect(e.state.winner).not.toBeNull();
-      for (const p of e.state.players) {
-        const total = p.deck.length + p.hand.length + p.graveyard.length
-          + p.monsters.filter(Boolean).length + p.spellTraps.filter(Boolean).length;
-        expect(total).toBe(30); // no card lost or duplicated (no control-change effects in wave 1)
-      }
+      // No card lost or duplicated. Count by OWNER: Monster Reborn can take control of the opponent's card.
+      const all = e.state.players.flatMap((p) => [
+        ...p.deck, ...p.hand, ...p.graveyard,
+        ...p.monsters.filter(Boolean).map((m) => m!.card), ...p.spellTraps.filter(Boolean).map((st) => st!.card),
+      ]);
+      expect(new Set(all.map((c) => c.uid)).size).toBe(60);
+      for (const owner of [0, 1]) expect(all.filter((c) => c.owner === owner)).toHaveLength(30);
     }
   });
 });

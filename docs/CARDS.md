@@ -95,21 +95,21 @@ During an arena fight, each side can fire each `arenaUsable` spell in its hand *
 | `atkPerNamedInGraveyards` | {cardId, atk, scope: "both"|"own"} | Continuous self stat mod: +atk for each card with id cardId in the chosen graveyards (Dark Magician Girl). | Dark Magician Girl |
 | `atkPerOwnGraveyardMonster` | {atk} | Continuous self stat mod: +atk per monster in controller's GY (Swordstalker). | Swordstalker |
 | `breakerCounter` | {atk} | onSelfSummon (Normal Summon): +atk permanent mod and a counter. Ignition (activate from field, target S/T): remove the counter (−atk) to destroy the target. Once. | Breaker the Magical Warrior |
-| `damage` | {n} | Inflict n damage to the opponent. Registered. | Ookazi |
+| `damage` | {n} | Inflict n damage to the opponent. | Ookazi |
 | `destroyAllMonsters` | — | Destroy every monster on the field (both sides). | Dark Hole |
-| `destroyAllOpponentMonsters` | — | Destroy every monster the opponent controls. Registered. | Raigeki |
-| `destroyAttackPosition` | — | Trap (attack declared): destroy all opponent Attack Position monsters; negate the attack. Registered (Mirror Force). | Mirror Force |
-| `destroyAttacker` | — | Trap (attack declared): destroy the attacker. Registered (Sakuretsu Armor). | Sakuretsu Armor |
+| `destroyAllOpponentMonsters` | — | Destroy every monster the opponent controls. | Raigeki |
+| `destroyAttackPosition` | — | Trap (attack declared): destroy all opponent Attack Position monsters; negate the attack. | Mirror Force |
+| `destroyAttacker` | — | Trap (attack declared): destroy the attacker. | Sakuretsu Armor |
 | `destroyLowestAtkOpponent` | — | Destroy the opponent's face-up monster with the lowest ATK (non-targeting; tie → random via ops.random). Not activatable if none face-up. | Fissure |
-| `destroySummoned` | {minAtk} | Trap (opponent Normal Summon): destroy it if ATK ≥ minAtk. Registered (Trap Hole). | Trap Hole |
+| `destroySummoned` | {minAtk} | Trap (opponent Normal Summon): destroy it if ATK ≥ minAtk. | Trap Hole |
 | `destroyTargetSpellTrap` | — | Target 1 Spell/Trap on the field (either side, face-up or set); destroy it. Quick-Play. | Mystical Space Typhoon |
 | `doubleTribute` | {attribute} | Tribute rule hook: when tributing for a monster of `attribute`, this card counts as 2 tributes (Kaiser Sea Horse). | Kaiser Sea Horse |
-| `draw` | {n} | Controller draws n cards (Pot of Greed: n=2). Registered. | Pot of Greed |
-| `equipAtk` | {atk, def, types?} | Equip to a face-up monster: +atk/+def. `types` (comma-separated MonsterType list) restricts legal targets — the registered handler does not check `types` yet. | Book of Secret Arts, Dark Energy, Legendary Sword |
-| `heal` | {n} | Controller gains n LP. Registered. | Dian Keto the Cure Master |
+| `draw` | {n} | Controller draws n cards (Pot of Greed: n=2). | Pot of Greed |
+| `equipAtk` | {atk, def, types?} | Equip to a face-up monster: +atk/+def. `types` (comma-separated MonsterType list) restricts legal targets. | Book of Secret Arts, Dark Energy, Legendary Sword |
+| `heal` | {n} | Controller gains n LP. | Dian Keto the Cure Master |
 | `magicCylinder` | — | Trap (attack declared): negate the attack and inflict damage to the attacker's controller equal to the attacker's current ATK. | Magic Cylinder |
 | `monsterReborn` | {from: "either"} | Target a monster in either GY; Special Summon it under your control (face-up Attack by default). | Monster Reborn |
-| `negateAttack` | {endBattlePhase?} | Trap (attack declared): negate the attack; if endBattlePhase, end the opponent's Battle Phase. Registered (does not end BP yet). | Negate Attack |
+| `negateAttack` | {endBattlePhase?} | Trap (attack declared): negate the attack; if endBattlePhase, end the opponent's Battle Phase. Ends the BP via the `battleEnded` player flag. | Negate Attack |
 | `noBattleDamageWhenDestroyed` | — | If this monster is destroyed by battle, its controller takes 0 battle damage from that battle (Kuriboh). | Kuriboh |
 | `piercing` | {defenseAfterAttack} | Battle hook: when this attacks a Defense Position monster and wins, inflict ATK−DEF to the opponent; if defenseAfterAttack, switch to Defense Position after attacking (Spear Dragon). | Spear Dragon |
 | `protectTypeFromTargeting` | {types} | Continuous while face-up: monsters of `types` on the field cannot be chosen by getTargets of card effects (Lord of D.). | Lord of D. |
@@ -118,3 +118,5 @@ During an arena fight, each side can fire each `arenaUsable` spell in its hand *
 | `switchToAttackAfterAttacked` | — | If this monster was attacked while in Defense Position and survives, switch it to Attack Position after the battle (Big Shield Gardna). | Big Shield Gardna |
 | `swordsOfRevealingLight` | {turns} | Continuous: opponent's monsters cannot declare attacks; flip opponent face-down monsters face-up on activation; self-destructs after `turns` opponent turns. | Swords of Revealing Light |
 | `waboku` | — | Trap (attack declared): for the rest of the turn, controller takes 0 battle damage and its monsters cannot be destroyed by battle (arena still plays; loser survives). | Waboku |
+
+All effect ids above are registered (spells in `src/core/cards/effects/spells.ts`, traps in `traps.ts`, monsters in `monsters.ts`, generic ones in `EffectRegistry.ts`) and covered by `tests/effects.test.ts`.
