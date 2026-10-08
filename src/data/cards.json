@@ -1,0 +1,1619 @@
+[
+  {
+    "kind": "monster",
+    "isEffect": false,
+    "rarity": "ultra",
+    "id": "dark-magician",
+    "name": "Dark Magician",
+    "attribute": "DARK",
+    "monsterType": "Spellcaster",
+    "level": 7,
+    "atk": 2500,
+    "def": 2100,
+    "text": "The ultimate wizard in terms of attack and defense.",
+    "arenaAbilities": [
+      {
+        "id": "dark-magic-attack",
+        "name": "Dark Magic Attack",
+        "kind": "projectile",
+        "power": 2.2,
+        "cooldown": 5,
+        "description": "Hurls a crackling orb of dark magic from his staff."
+      }
+    ],
+    "palette": [
+      "#4b2a7b",
+      "#7d4fc0",
+      "#1f8f8a",
+      "#f0c8a0",
+      "#20123a"
+    ]
+  },
+  {
+    "kind": "monster",
+    "isEffect": true,
+    "rarity": "super",
+    "id": "dark-magician-girl",
+    "name": "Dark Magician Girl",
+    "attribute": "DARK",
+    "monsterType": "Spellcaster",
+    "level": 6,
+    "atk": 2000,
+    "def": 1700,
+    "text": "Gains 300 ATK for each \"Dark Magician\" in either player's Graveyard.",
+    "effect": {
+      "id": "atkPerNamedInGraveyards",
+      "params": {
+        "cardId": "dark-magician",
+        "atk": 300,
+        "scope": "both"
+      }
+    },
+    "arenaAbilities": [
+      {
+        "id": "dark-burning-attack",
+        "name": "Dark Burning Attack",
+        "kind": "projectile",
+        "power": 1.6,
+        "cooldown": 6,
+        "description": "Fires a pink burst of magic from her wand."
+      },
+      {
+        "id": "masters-blessing",
+        "name": "Master's Blessing",
+        "kind": "buff",
+        "power": 0,
+        "cooldown": 8,
+        "duration": 3,
+        "magnitude": 1.3,
+        "description": "Channels her master's power: +30% Power for 3 s."
+      }
+    ],
+    "palette": [
+      "#3a5fcd",
+      "#f6d36b",
+      "#f2b8c6",
+      "#f5d0b0",
+      "#1c2a6b"
+    ]
+  },
+  {
+    "kind": "monster",
+    "isEffect": false,
+    "rarity": "common",
+    "id": "celtic-guardian",
+    "name": "Celtic Guardian",
+    "attribute": "EARTH",
+    "monsterType": "Warrior",
+    "level": 4,
+    "atk": 1400,
+    "def": 1200,
+    "text": "An elf who learned to wield a sword, he baffles enemies with lightning-swift attacks.",
+    "arenaStyle": "swift",
+    "arenaAbilities": [
+      {
+        "id": "elven-blade-flurry",
+        "name": "Elven Blade Flurry",
+        "kind": "dash",
+        "power": 1.6,
+        "cooldown": 6,
+        "description": "Lightning-swift sword lunge."
+      }
+    ],
+    "palette": [
+      "#3f7a3a",
+      "#b8b8c0",
+      "#e8c9a0",
+      "#6b4a2b"
+    ]
+  },
+  {
+    "kind": "monster",
+    "isEffect": false,
+    "rarity": "super",
+    "id": "summoned-skull",
+    "name": "Summoned Skull",
+    "attribute": "DARK",
+    "monsterType": "Fiend",
+    "level": 6,
+    "atk": 2500,
+    "def": 1200,
+    "text": "A fiend with dark powers for confusing the enemy.",
+    "arenaStyle": "bruiser",
+    "arenaAbilities": [
+      {
+        "id": "lightning-strike",
+        "name": "Lightning Strike",
+        "kind": "aoe",
+        "power": 2.3,
+        "cooldown": 7,
+        "description": "Calls down a storm of lightning around itself."
+      }
+    ],
+    "palette": [
+      "#e8e2d0",
+      "#5a3d6e",
+      "#8c2f2f",
+      "#f2e64a",
+      "#2a1b33"
+    ]
+  },
+  {
+    "kind": "monster",
+    "isEffect": false,
+    "rarity": "rare",
+    "id": "curse-of-dragon",
+    "name": "Curse of Dragon",
+    "attribute": "DARK",
+    "monsterType": "Dragon",
+    "level": 5,
+    "atk": 2000,
+    "def": 1500,
+    "text": "A wicked dragon that taps into dark forces to execute a powerful attack.",
+    "arenaAbilities": [
+      {
+        "id": "dragon-flame",
+        "name": "Dragon Flame",
+        "kind": "projectile",
+        "power": 2,
+        "cooldown": 5.5,
+        "description": "Breathes a cursed fireball."
+      }
+    ],
+    "palette": [
+      "#c9a34a",
+      "#7a5a22",
+      "#d94a2b",
+      "#3b2a14"
+    ],
+    "arenaStyle": "ranged"
+  },
+  {
+    "kind": "monster",
+    "isEffect": false,
+    "rarity": "ultra",
+    "id": "gaia-the-fierce-knight",
+    "name": "Gaia The Fierce Knight",
+    "attribute": "EARTH",
+    "monsterType": "Warrior",
+    "level": 7,
+    "atk": 2300,
+    "def": 2100,
+    "text": "A knight whose horse travels faster than the wind. His battle-charge is a force to be reckoned with.",
+    "arenaStyle": "swift",
+    "arenaAbilities": [
+      {
+        "id": "spiral-spear-charge",
+        "name": "Spiral Spear Charge",
+        "kind": "dash",
+        "power": 2,
+        "cooldown": 4.5,
+        "description": "Mounted charge with twin spiral lances."
+      }
+    ],
+    "palette": [
+      "#2f4fa8",
+      "#d9b84a",
+      "#5b3fa0",
+      "#8a5a3a",
+      "#e6e6ee"
+    ]
+  },
+  {
+    "kind": "monster",
+    "isEffect": false,
+    "rarity": "common",
+    "id": "alpha-the-magnet-warrior",
+    "name": "Alpha The Magnet Warrior",
+    "attribute": "EARTH",
+    "monsterType": "Rock",
+    "level": 4,
+    "atk": 1400,
+    "def": 1700,
+    "text": "Alpha, Beta, and Gamma meld as one to form a powerful monster.",
+    "arenaStyle": "melee",
+    "arenaAbilities": [
+      {
+        "id": "magnet-sword-slash",
+        "name": "Magnet Sword Slash",
+        "kind": "dash",
+        "power": 1.6,
+        "cooldown": 6,
+        "description": "Magnetized sword lunge."
+      }
+    ],
+    "palette": [
+      "#d94a3a",
+      "#e8c84a",
+      "#8a8a96",
+      "#3a3a44"
+    ]
+  },
+  {
+    "kind": "monster",
+    "isEffect": false,
+    "rarity": "common",
+    "id": "beta-the-magnet-warrior",
+    "name": "Beta The Magnet Warrior",
+    "attribute": "EARTH",
+    "monsterType": "Rock",
+    "level": 4,
+    "atk": 1700,
+    "def": 1600,
+    "text": "Alpha, Beta, and Gamma meld as one to form a powerful monster.",
+    "arenaAbilities": [
+      {
+        "id": "magnet-shield",
+        "name": "Magnet Shield",
+        "kind": "shield",
+        "power": 0,
+        "cooldown": 7,
+        "duration": 3,
+        "magnitude": 0.5,
+        "description": "Raises its magnetic shield: -40% damage for 2.5 s."
+      }
+    ],
+    "palette": [
+      "#e8c84a",
+      "#2f5fb8",
+      "#8a8a96",
+      "#3a3a44"
+    ]
+  },
+  {
+    "kind": "monster",
+    "isEffect": false,
+    "rarity": "common",
+    "id": "gamma-the-magnet-warrior",
+    "name": "Gamma The Magnet Warrior",
+    "attribute": "EARTH",
+    "monsterType": "Rock",
+    "level": 4,
+    "atk": 1500,
+    "def": 1800,
+    "text": "Alpha, Beta, and Gamma meld as one to form a powerful monster.",
+    "arenaAbilities": [
+      {
+        "id": "magnetic-pulse",
+        "name": "Magnetic Pulse",
+        "kind": "stun",
+        "power": 0.8,
+        "cooldown": 7,
+        "duration": 0.8,
+        "description": "A polarity pulse that locks the foe in place."
+      }
+    ],
+    "palette": [
+      "#3a9a5a",
+      "#e06ab0",
+      "#8a8a96",
+      "#3a3a44"
+    ]
+  },
+  {
+    "kind": "monster",
+    "isEffect": false,
+    "rarity": "common",
+    "id": "giant-soldier-of-stone",
+    "name": "Giant Soldier of Stone",
+    "attribute": "EARTH",
+    "monsterType": "Rock",
+    "level": 3,
+    "atk": 1300,
+    "def": 2000,
+    "text": "A giant warrior made of stone. A punch from this creature has earth-shaking results.",
+    "arenaAbilities": [
+      {
+        "id": "stone-wall",
+        "name": "Stone Wall",
+        "kind": "shield",
+        "power": 0,
+        "cooldown": 7,
+        "duration": 3,
+        "magnitude": 0.5,
+        "description": "Turns to solid granite: -50% damage for 3 s."
+      }
+    ],
+    "palette": [
+      "#8a8070",
+      "#b5ab98",
+      "#5a5248",
+      "#3a342c"
+    ]
+  },
+  {
+    "kind": "monster",
+    "isEffect": true,
+    "rarity": "rare",
+    "id": "kuriboh",
+    "name": "Kuriboh",
+    "attribute": "DARK",
+    "monsterType": "Fiend",
+    "level": 1,
+    "atk": 300,
+    "def": 200,
+    "text": "If this card is destroyed by battle, you take no battle damage from that battle.",
+    "arenaStyle": "swift",
+    "effect": {
+      "id": "noBattleDamageWhenDestroyed"
+    },
+    "arenaAbilities": [
+      {
+        "id": "fuzzball-guard",
+        "name": "Fuzzball Guard",
+        "kind": "shield",
+        "power": 0,
+        "cooldown": 8,
+        "duration": 2,
+        "magnitude": 0.5,
+        "description": "Puffs up its fur: -60% damage for 3 s."
+      },
+      {
+        "id": "kuri-burst",
+        "name": "Kuri Burst",
+        "kind": "aoe",
+        "power": 1.5,
+        "cooldown": 10,
+        "description": "Pops in a cloud of fuzz, hurting anything nearby."
+      }
+    ],
+    "palette": [
+      "#7a4a2a",
+      "#a8703f",
+      "#3fa040",
+      "#f5e6c8"
+    ]
+  },
+  {
+    "kind": "monster",
+    "isEffect": true,
+    "rarity": "rare",
+    "id": "big-shield-gardna",
+    "name": "Big Shield Gardna",
+    "attribute": "EARTH",
+    "monsterType": "Warrior",
+    "level": 4,
+    "atk": 100,
+    "def": 2600,
+    "text": "If this Defense Position card is attacked, change it to Attack Position after the battle.",
+    "arenaStyle": "bruiser",
+    "effect": {
+      "id": "switchToAttackAfterAttacked"
+    },
+    "arenaAbilities": [
+      {
+        "id": "big-shield",
+        "name": "Big Shield",
+        "kind": "shield",
+        "power": 0,
+        "cooldown": 8,
+        "duration": 3,
+        "magnitude": 0.5,
+        "description": "Plants the great shield: -60% damage for 3 s."
+      },
+      {
+        "id": "shield-bash",
+        "name": "Shield Bash",
+        "kind": "stun",
+        "power": 0.5,
+        "cooldown": 10,
+        "duration": 0.6,
+        "description": "Slams the shield into the foe, stunning it."
+      }
+    ],
+    "palette": [
+      "#c9c9d2",
+      "#8a6a3a",
+      "#3a5a9a",
+      "#e8c9a0"
+    ]
+  },
+  {
+    "kind": "monster",
+    "isEffect": false,
+    "rarity": "common",
+    "id": "feral-imp",
+    "name": "Feral Imp",
+    "attribute": "DARK",
+    "monsterType": "Fiend",
+    "level": 4,
+    "atk": 1300,
+    "def": 1400,
+    "text": "A playful little fiend that lurks in the dark, waiting to attack an unwary enemy.",
+    "arenaStyle": "ranged",
+    "arenaAbilities": [
+      {
+        "id": "horn-lightning",
+        "name": "Horn Lightning",
+        "kind": "projectile",
+        "power": 1.6,
+        "cooldown": 6,
+        "description": "Shoots a spark from its horn."
+      }
+    ],
+    "palette": [
+      "#3f8a4a",
+      "#9a3a3a",
+      "#f0e04a",
+      "#1f3322"
+    ]
+  },
+  {
+    "kind": "monster",
+    "isEffect": false,
+    "rarity": "common",
+    "id": "mystical-elf",
+    "name": "Mystical Elf",
+    "attribute": "LIGHT",
+    "monsterType": "Spellcaster",
+    "level": 4,
+    "atk": 800,
+    "def": 2000,
+    "text": "A delicate elf that lacks offense, but has a terrific defense backed by mystical power.",
+    "arenaAbilities": [
+      {
+        "id": "elven-prayer",
+        "name": "Elven Prayer",
+        "kind": "heal",
+        "power": 0,
+        "cooldown": 8,
+        "magnitude": 0.2,
+        "description": "A mystic chant that restores 20% max HP."
+      }
+    ],
+    "palette": [
+      "#3a7ad0",
+      "#f0d070",
+      "#9ad0f0",
+      "#f5d8c0"
+    ]
+  },
+  {
+    "kind": "monster",
+    "isEffect": false,
+    "rarity": "common",
+    "id": "silver-fang",
+    "name": "Silver Fang",
+    "attribute": "EARTH",
+    "monsterType": "Beast",
+    "level": 3,
+    "atk": 1200,
+    "def": 800,
+    "text": "A snow wolf that's beautiful to the eye, but absolutely vicious in battle.",
+    "arenaAbilities": [
+      {
+        "id": "fang-pounce",
+        "name": "Fang Pounce",
+        "kind": "dash",
+        "power": 1.5,
+        "cooldown": 6,
+        "description": "Leaps on the foe, fangs first."
+      }
+    ],
+    "palette": [
+      "#e6eaf0",
+      "#a8b4c4",
+      "#5a6a80",
+      "#2a3040"
+    ]
+  },
+  {
+    "kind": "monster",
+    "isEffect": false,
+    "rarity": "common",
+    "id": "mammoth-graveyard",
+    "name": "Mammoth Graveyard",
+    "attribute": "EARTH",
+    "monsterType": "Dinosaur",
+    "level": 3,
+    "atk": 1200,
+    "def": 800,
+    "text": "A mammoth that protects the graves of its pack and is absolutely merciless when facing grave-robbers.",
+    "arenaAbilities": [
+      {
+        "id": "tusk-stampede",
+        "name": "Tusk Stampede",
+        "kind": "dash",
+        "power": 1.7,
+        "cooldown": 6,
+        "description": "A bone-rattling tusk charge."
+      }
+    ],
+    "palette": [
+      "#e8e0c8",
+      "#a89a78",
+      "#6a5a40",
+      "#2a2418"
+    ]
+  },
+  {
+    "kind": "monster",
+    "isEffect": true,
+    "rarity": "rare",
+    "id": "breaker-the-magical-warrior",
+    "name": "Breaker the Magical Warrior",
+    "attribute": "DARK",
+    "monsterType": "Spellcaster",
+    "level": 4,
+    "atk": 1600,
+    "def": 1000,
+    "text": "When Normal Summoned: gains 300 ATK. Once while face-up, you can remove that bonus to destroy 1 Spell/Trap on the field.",
+    "arenaStyle": "melee",
+    "effect": {
+      "id": "breakerCounter",
+      "params": {
+        "atk": 300
+      }
+    },
+    "arenaAbilities": [
+      {
+        "id": "mana-blade",
+        "name": "Mana Blade",
+        "kind": "dash",
+        "power": 1.2,
+        "cooldown": 7,
+        "description": "A spell-charged sword thrust."
+      },
+      {
+        "id": "spell-break",
+        "name": "Spell Break",
+        "kind": "stun",
+        "power": 0.4,
+        "cooldown": 10,
+        "duration": 0.6,
+        "description": "Shatters the foe's focus, stunning it."
+      }
+    ],
+    "palette": [
+      "#8a2a3a",
+      "#4a4a5a",
+      "#c9c9d2",
+      "#e8c94a",
+      "#f0c8a0"
+    ]
+  },
+  {
+    "kind": "monster",
+    "isEffect": false,
+    "rarity": "ultra",
+    "id": "blue-eyes-white-dragon",
+    "name": "Blue-Eyes White Dragon",
+    "attribute": "LIGHT",
+    "monsterType": "Dragon",
+    "level": 8,
+    "atk": 3000,
+    "def": 2500,
+    "text": "This legendary dragon is a powerful engine of destruction. Virtually invincible, very few have faced this awesome creature and lived to tell the tale.",
+    "arenaAbilities": [
+      {
+        "id": "burst-stream",
+        "name": "Burst Stream of Destruction",
+        "kind": "projectile",
+        "power": 2.5,
+        "cooldown": 6,
+        "description": "A massive beam of white light."
+      }
+    ],
+    "palette": [
+      "#eef4fa",
+      "#a8c8e8",
+      "#3a8ad8",
+      "#5a6a8a",
+      "#1a2a4a"
+    ]
+  },
+  {
+    "kind": "monster",
+    "isEffect": true,
+    "rarity": "rare",
+    "id": "lord-of-d",
+    "name": "Lord of D.",
+    "attribute": "DARK",
+    "monsterType": "Spellcaster",
+    "level": 4,
+    "atk": 1200,
+    "def": 1100,
+    "text": "Dragon-Type monsters on the field cannot be targeted by card effects.",
+    "effect": {
+      "id": "protectTypeFromTargeting",
+      "params": {
+        "types": "Dragon"
+      }
+    },
+    "arenaAbilities": [
+      {
+        "id": "dragon-dread-bolt",
+        "name": "Dread Bolt",
+        "kind": "projectile",
+        "power": 1,
+        "cooldown": 8,
+        "description": "A bolt of fear-magic."
+      },
+      {
+        "id": "dragon-ward",
+        "name": "Dragon Ward",
+        "kind": "shield",
+        "power": 0,
+        "cooldown": 7,
+        "duration": 2,
+        "magnitude": 0.4,
+        "description": "Draconic bone armor: -40% damage for 2 s."
+      }
+    ],
+    "palette": [
+      "#3a3a4a",
+      "#d0d0d8",
+      "#3a7a5a",
+      "#c9a34a",
+      "#1a1a22"
+    ]
+  },
+  {
+    "kind": "monster",
+    "isEffect": false,
+    "rarity": "common",
+    "id": "battle-ox",
+    "name": "Battle Ox",
+    "attribute": "EARTH",
+    "monsterType": "Beast-Warrior",
+    "level": 4,
+    "atk": 1700,
+    "def": 1000,
+    "text": "A monster with tremendous power, it destroys enemies with a swing of its axe.",
+    "arenaStyle": "bruiser",
+    "arenaAbilities": [
+      {
+        "id": "axe-cleave",
+        "name": "Axe Cleave",
+        "kind": "aoe",
+        "power": 1.6,
+        "cooldown": 6,
+        "description": "A wide axe swing that hits all around."
+      }
+    ],
+    "palette": [
+      "#7a4a2a",
+      "#a8a8b0",
+      "#c9a070",
+      "#3a2a1a"
+    ]
+  },
+  {
+    "kind": "monster",
+    "isEffect": false,
+    "rarity": "common",
+    "id": "la-jinn",
+    "name": "La Jinn the Mystical Genie of the Lamp",
+    "attribute": "DARK",
+    "monsterType": "Fiend",
+    "level": 4,
+    "atk": 1800,
+    "def": 1000,
+    "text": "A genie of the lamp that is at the beck and call of its master.",
+    "arenaStyle": "ranged",
+    "arenaAbilities": [
+      {
+        "id": "genie-fist",
+        "name": "Genie Fist",
+        "kind": "projectile",
+        "power": 1.7,
+        "cooldown": 6,
+        "description": "A giant spectral fist launched at the foe."
+      }
+    ],
+    "palette": [
+      "#3a7ac8",
+      "#e8c84a",
+      "#8a3a9a",
+      "#1a2a5a"
+    ]
+  },
+  {
+    "kind": "monster",
+    "isEffect": false,
+    "rarity": "common",
+    "id": "vorse-raider",
+    "name": "Vorse Raider",
+    "attribute": "DARK",
+    "monsterType": "Beast-Warrior",
+    "level": 4,
+    "atk": 1900,
+    "def": 1200,
+    "text": "This wicked Beast-Warrior does every horrid thing imaginable, and loves it!",
+    "arenaAbilities": [
+      {
+        "id": "raider-rampage",
+        "name": "Raider Rampage",
+        "kind": "dash",
+        "power": 1.7,
+        "cooldown": 6,
+        "description": "A brutal axe-blade rush."
+      }
+    ],
+    "palette": [
+      "#5a3a6a",
+      "#c9a34a",
+      "#8a8a96",
+      "#3a1a2a"
+    ]
+  },
+  {
+    "kind": "monster",
+    "isEffect": false,
+    "rarity": "common",
+    "id": "rude-kaiser",
+    "name": "Rude Kaiser",
+    "attribute": "EARTH",
+    "monsterType": "Beast-Warrior",
+    "level": 5,
+    "atk": 1800,
+    "def": 1600,
+    "text": "With an axe in each hand, this monster delivers heavy damage.",
+    "arenaStyle": "bruiser",
+    "arenaAbilities": [
+      {
+        "id": "twin-axe-spin",
+        "name": "Twin Axe Spin",
+        "kind": "aoe",
+        "power": 1.8,
+        "cooldown": 6,
+        "description": "Spins with both axes out."
+      }
+    ],
+    "palette": [
+      "#3a5a8a",
+      "#c9c9d2",
+      "#d0a060",
+      "#2a2a3a"
+    ]
+  },
+  {
+    "kind": "monster",
+    "isEffect": false,
+    "rarity": "common",
+    "id": "ryu-kishin-powered",
+    "name": "Ryu-Kishin Powered",
+    "attribute": "DARK",
+    "monsterType": "Fiend",
+    "level": 4,
+    "atk": 1600,
+    "def": 1200,
+    "text": "A gargoyle enhanced by the powers of darkness. Very sharp talons make it a worthy opponent.",
+    "arenaAbilities": [
+      {
+        "id": "talon-dive",
+        "name": "Talon Dive",
+        "kind": "dash",
+        "power": 1.6,
+        "cooldown": 6,
+        "description": "Swoops in with razor talons."
+      }
+    ],
+    "palette": [
+      "#4a6a4a",
+      "#8a8a5a",
+      "#d0d0a0",
+      "#1a2a1a"
+    ]
+  },
+  {
+    "kind": "monster",
+    "isEffect": false,
+    "rarity": "common",
+    "id": "hitotsu-me-giant",
+    "name": "Hitotsu-Me Giant",
+    "attribute": "EARTH",
+    "monsterType": "Beast-Warrior",
+    "level": 4,
+    "atk": 1200,
+    "def": 1000,
+    "text": "A one-eyed behemoth with thick, powerful arms made for delivering punishing blows.",
+    "arenaStyle": "bruiser",
+    "arenaAbilities": [
+      {
+        "id": "cyclops-punch",
+        "name": "Cyclops Punch",
+        "kind": "stun",
+        "power": 0.8,
+        "cooldown": 7,
+        "duration": 0.8,
+        "description": "A punishing haymaker that dazes the foe."
+      }
+    ],
+    "palette": [
+      "#6a8a4a",
+      "#a87a4a",
+      "#f0f0e0",
+      "#2a3a1a"
+    ]
+  },
+  {
+    "kind": "monster",
+    "isEffect": false,
+    "rarity": "common",
+    "id": "saggi-the-dark-clown",
+    "name": "Saggi the Dark Clown",
+    "attribute": "DARK",
+    "monsterType": "Spellcaster",
+    "level": 3,
+    "atk": 600,
+    "def": 1500,
+    "text": "This clown appears from nowhere and executes very strange moves to avoid enemy attacks.",
+    "arenaAbilities": [
+      {
+        "id": "clowns-hex",
+        "name": "Clown's Hex",
+        "kind": "stun",
+        "power": 0.5,
+        "cooldown": 7,
+        "duration": 0.9,
+        "description": "A baffling trick that freezes the foe."
+      }
+    ],
+    "palette": [
+      "#d8d0e8",
+      "#5a3a8a",
+      "#d03a5a",
+      "#2a1a3a"
+    ]
+  },
+  {
+    "kind": "monster",
+    "isEffect": true,
+    "rarity": "rare",
+    "id": "kaiser-sea-horse",
+    "name": "Kaiser Sea Horse",
+    "attribute": "LIGHT",
+    "monsterType": "Sea Serpent",
+    "level": 4,
+    "atk": 1700,
+    "def": 1650,
+    "text": "When you Tribute Summon a LIGHT monster, this card can count as 2 Tributes.",
+    "effect": {
+      "id": "doubleTribute",
+      "params": {
+        "attribute": "LIGHT"
+      }
+    },
+    "arenaAbilities": [
+      {
+        "id": "trident-thrust",
+        "name": "Trident Thrust",
+        "kind": "dash",
+        "power": 1.2,
+        "cooldown": 7,
+        "description": "A lunging trident strike."
+      },
+      {
+        "id": "tide-ward",
+        "name": "Tide Ward",
+        "kind": "shield",
+        "power": 0,
+        "cooldown": 7,
+        "duration": 2,
+        "magnitude": 0.3,
+        "description": "A wall of seawater: -30% damage for 2 s."
+      }
+    ],
+    "palette": [
+      "#3aa0b8",
+      "#e8d070",
+      "#c9c9d2",
+      "#1a4a6a"
+    ],
+    "arenaStyle": "melee"
+  },
+  {
+    "kind": "monster",
+    "isEffect": false,
+    "rarity": "rare",
+    "id": "judge-man",
+    "name": "Judge Man",
+    "attribute": "EARTH",
+    "monsterType": "Warrior",
+    "level": 6,
+    "atk": 2200,
+    "def": 1500,
+    "text": "With a powerful club in each hand, this monster deals harsh judgment on his enemies.",
+    "arenaStyle": "bruiser",
+    "arenaAbilities": [
+      {
+        "id": "gavel-smash",
+        "name": "Gavel Smash",
+        "kind": "aoe",
+        "power": 2.2,
+        "cooldown": 7,
+        "description": "Slams both clubs into the ground."
+      }
+    ],
+    "palette": [
+      "#e8e8f0",
+      "#8a2a2a",
+      "#c9a34a",
+      "#3a3a4a"
+    ]
+  },
+  {
+    "kind": "monster",
+    "isEffect": true,
+    "rarity": "rare",
+    "id": "swordstalker",
+    "name": "Swordstalker",
+    "attribute": "DARK",
+    "monsterType": "Warrior",
+    "level": 6,
+    "atk": 2000,
+    "def": 1600,
+    "text": "Gains 100 ATK for each monster in your Graveyard.",
+    "effect": {
+      "id": "atkPerOwnGraveyardMonster",
+      "params": {
+        "atk": 100
+      }
+    },
+    "arenaAbilities": [
+      {
+        "id": "vengeful-blade",
+        "name": "Vengeful Blade",
+        "kind": "dash",
+        "power": 1.5,
+        "cooldown": 6,
+        "description": "A blade carrying the grudge of the fallen."
+      },
+      {
+        "id": "grudge-surge",
+        "name": "Grudge Surge",
+        "kind": "buff",
+        "power": 0,
+        "cooldown": 10,
+        "duration": 3,
+        "magnitude": 1.3,
+        "description": "Fallen spirits empower it: +40% Power for 3 s."
+      }
+    ],
+    "palette": [
+      "#2a2a3a",
+      "#6a3a9a",
+      "#c9c9d2",
+      "#d03a3a"
+    ]
+  },
+  {
+    "kind": "monster",
+    "isEffect": false,
+    "rarity": "common",
+    "id": "x-head-cannon",
+    "name": "X-Head Cannon",
+    "attribute": "LIGHT",
+    "monsterType": "Machine",
+    "level": 4,
+    "atk": 1800,
+    "def": 1500,
+    "text": "A monster with a mighty cannon barrel, it is able to integrate its attacks.",
+    "arenaStyle": "ranged",
+    "arenaAbilities": [
+      {
+        "id": "twin-cannons",
+        "name": "Twin Cannons",
+        "kind": "projectile",
+        "power": 1.7,
+        "cooldown": 6,
+        "description": "Fires both shoulder cannons."
+      }
+    ],
+    "palette": [
+      "#3a5ab8",
+      "#e8c84a",
+      "#d03a3a",
+      "#c9c9d2",
+      "#1a2a4a"
+    ]
+  },
+  {
+    "kind": "monster",
+    "isEffect": true,
+    "rarity": "common",
+    "id": "y-dragon-head",
+    "name": "Y-Dragon Head",
+    "attribute": "LIGHT",
+    "monsterType": "Machine",
+    "level": 4,
+    "atk": 1500,
+    "def": 1600,
+    "text": "Gains 400 ATK and DEF while you control \"X-Head Cannon\" (simplified Union).",
+    "effect": {
+      "id": "allyBoost",
+      "params": {
+        "ally": "x-head-cannon",
+        "atk": 400,
+        "def": 400
+      }
+    },
+    "arenaStyle": "ranged",
+    "arenaAbilities": [
+      {
+        "id": "dragon-head-blaster",
+        "name": "Dragon Head Blaster",
+        "kind": "projectile",
+        "power": 1.2,
+        "cooldown": 7,
+        "description": "A laser from its mechanical jaws."
+      },
+      {
+        "id": "union-link",
+        "name": "Union Link",
+        "kind": "buff",
+        "power": 0,
+        "cooldown": 8,
+        "duration": 3,
+        "magnitude": 1.2,
+        "description": "Locks into combat mode: +20% Power for 3 s."
+      }
+    ],
+    "palette": [
+      "#d03a3a",
+      "#e8c84a",
+      "#3a5ab8",
+      "#c9c9d2"
+    ]
+  },
+  {
+    "kind": "monster",
+    "isEffect": true,
+    "rarity": "common",
+    "id": "z-metal-tank",
+    "name": "Z-Metal Tank",
+    "attribute": "LIGHT",
+    "monsterType": "Machine",
+    "level": 4,
+    "atk": 1500,
+    "def": 1300,
+    "text": "Gains 400 ATK and DEF while you control \"X-Head Cannon\" (simplified Union).",
+    "effect": {
+      "id": "allyBoost",
+      "params": {
+        "ally": "x-head-cannon",
+        "atk": 400,
+        "def": 400
+      }
+    },
+    "arenaAbilities": [
+      {
+        "id": "tread-ram",
+        "name": "Tread Ram",
+        "kind": "dash",
+        "power": 1.2,
+        "cooldown": 7,
+        "description": "Rolls forward on heavy treads."
+      },
+      {
+        "id": "armor-plating",
+        "name": "Armor Plating",
+        "kind": "shield",
+        "power": 0,
+        "cooldown": 8,
+        "duration": 2.5,
+        "magnitude": 0.4,
+        "description": "Locks its plates: -40% damage for 2.5 s."
+      }
+    ],
+    "palette": [
+      "#e8c84a",
+      "#3a5ab8",
+      "#8a8a96",
+      "#2a2a3a"
+    ]
+  },
+  {
+    "kind": "monster",
+    "isEffect": false,
+    "rarity": "common",
+    "id": "krokodilus",
+    "name": "Krokodilus",
+    "attribute": "WATER",
+    "monsterType": "Reptile",
+    "level": 4,
+    "atk": 1100,
+    "def": 1200,
+    "text": "A cunning crocodile that lurks in murky waters and drags its prey under.",
+    "arenaAbilities": [
+      {
+        "id": "death-roll",
+        "name": "Death Roll",
+        "kind": "dash",
+        "power": 1.5,
+        "cooldown": 6,
+        "description": "Snaps and rolls into the foe."
+      }
+    ],
+    "palette": [
+      "#4a7a3a",
+      "#a8c070",
+      "#e8e0b0",
+      "#1a2a1a"
+    ]
+  },
+  {
+    "kind": "monster",
+    "isEffect": false,
+    "rarity": "super",
+    "id": "hyozanryu",
+    "name": "Hyozanryu",
+    "attribute": "LIGHT",
+    "monsterType": "Dragon",
+    "level": 7,
+    "atk": 2100,
+    "def": 2800,
+    "text": "A dragon created from a massive diamond that sparkles with blinding light.",
+    "arenaAbilities": [
+      {
+        "id": "diamond-shard-storm",
+        "name": "Diamond Shard Storm",
+        "kind": "aoe",
+        "power": 2.4,
+        "cooldown": 6,
+        "description": "Erupts in a ring of razor-sharp diamond shards."
+      }
+    ],
+    "palette": [
+      "#e0f4ff",
+      "#9ad0f0",
+      "#c9a0e8",
+      "#5a7aa8"
+    ]
+  },
+  {
+    "kind": "monster",
+    "isEffect": true,
+    "rarity": "rare",
+    "id": "spear-dragon",
+    "name": "Spear Dragon",
+    "attribute": "WIND",
+    "monsterType": "Dragon",
+    "level": 4,
+    "atk": 1900,
+    "def": 0,
+    "text": "Inflicts piercing battle damage to Defense Position monsters. After it attacks, change it to Defense Position.",
+    "arenaStyle": "swift",
+    "effect": {
+      "id": "piercing",
+      "params": {
+        "defenseAfterAttack": true
+      }
+    },
+    "arenaAbilities": [
+      {
+        "id": "spear-drill-dive",
+        "name": "Spear Drill Dive",
+        "kind": "dash",
+        "power": 1.7,
+        "cooldown": 6,
+        "description": "Dives beak-first like a drill."
+      }
+    ],
+    "palette": [
+      "#5a9ad8",
+      "#e8e8f0",
+      "#e8c84a",
+      "#2a4a7a"
+    ]
+  },
+  {
+    "kind": "spell",
+    "rarity": "rare",
+    "id": "pot-of-greed",
+    "name": "Pot of Greed",
+    "speed": "normal",
+    "text": "Draw 2 cards.",
+    "effect": {
+      "id": "draw",
+      "params": {
+        "n": 2
+      }
+    },
+    "palette": [
+      "#3a9a4a",
+      "#c9a34a",
+      "#d03a3a"
+    ]
+  },
+  {
+    "kind": "spell",
+    "rarity": "rare",
+    "id": "dark-hole",
+    "name": "Dark Hole",
+    "speed": "normal",
+    "text": "Destroy all monsters on the field.",
+    "effect": {
+      "id": "destroyAllMonsters"
+    },
+    "palette": [
+      "#1a1a2a",
+      "#5a3a8a",
+      "#9a6ad0"
+    ]
+  },
+  {
+    "kind": "spell",
+    "rarity": "super",
+    "id": "raigeki",
+    "name": "Raigeki",
+    "speed": "normal",
+    "text": "Destroy all monsters your opponent controls.",
+    "effect": {
+      "id": "destroyAllOpponentMonsters"
+    },
+    "palette": [
+      "#f0e04a",
+      "#3a3a6a",
+      "#e8e8f0"
+    ]
+  },
+  {
+    "kind": "spell",
+    "rarity": "super",
+    "id": "monster-reborn",
+    "name": "Monster Reborn",
+    "speed": "normal",
+    "text": "Special Summon 1 monster from either player's Graveyard.",
+    "effect": {
+      "id": "monsterReborn",
+      "params": {
+        "from": "either"
+      }
+    },
+    "palette": [
+      "#e8d070",
+      "#3a8ac8",
+      "#f0f0e0"
+    ]
+  },
+  {
+    "kind": "spell",
+    "rarity": "rare",
+    "id": "swords-of-revealing-light",
+    "name": "Swords of Revealing Light",
+    "speed": "continuous",
+    "text": "Your opponent's monsters cannot attack for 3 of their turns. ARENA: rain of light swords stuns the foe for 1 s.",
+    "effect": {
+      "id": "swordsOfRevealingLight",
+      "params": {
+        "turns": 3
+      }
+    },
+    "arenaUsable": true,
+    "arenaAbilities": [
+      {
+        "id": "revealing-light",
+        "name": "Revealing Light",
+        "kind": "stun",
+        "power": 0,
+        "cooldown": 0,
+        "duration": 1,
+        "description": "Swords of light pin the enemy: stun 1 s."
+      }
+    ],
+    "palette": [
+      "#f0e8a0",
+      "#e8c84a",
+      "#3a5a9a"
+    ]
+  },
+  {
+    "kind": "spell",
+    "rarity": "common",
+    "id": "fissure",
+    "name": "Fissure",
+    "speed": "normal",
+    "text": "Destroy the face-up monster your opponent controls with the lowest ATK. ARENA: the ground splits under the foe.",
+    "effect": {
+      "id": "destroyLowestAtkOpponent"
+    },
+    "arenaUsable": true,
+    "arenaAbilities": [
+      {
+        "id": "earth-split",
+        "name": "Earth Split",
+        "kind": "aoe",
+        "power": 3,
+        "cooldown": 0,
+        "description": "A shockwave of splitting earth bursts around the caster."
+      }
+    ],
+    "palette": [
+      "#8a6a3a",
+      "#3a2a1a",
+      "#d06a2a"
+    ]
+  },
+  {
+    "kind": "spell",
+    "rarity": "common",
+    "id": "book-of-secret-arts",
+    "name": "Book of Secret Arts",
+    "speed": "equip",
+    "text": "Equip only to a Spellcaster: it gains 300 ATK and DEF.",
+    "effect": {
+      "id": "equipAtk",
+      "params": {
+        "atk": 300,
+        "def": 300,
+        "types": "Spellcaster"
+      }
+    },
+    "palette": [
+      "#5a3a8a",
+      "#c9a34a",
+      "#e8e0c8"
+    ]
+  },
+  {
+    "kind": "spell",
+    "rarity": "common",
+    "id": "dark-energy",
+    "name": "Dark Energy",
+    "speed": "equip",
+    "text": "Equip only to a Fiend: it gains 300 ATK and DEF.",
+    "effect": {
+      "id": "equipAtk",
+      "params": {
+        "atk": 300,
+        "def": 300,
+        "types": "Fiend"
+      }
+    },
+    "palette": [
+      "#2a1a3a",
+      "#8a3a9a",
+      "#d03a5a"
+    ]
+  },
+  {
+    "kind": "spell",
+    "rarity": "common",
+    "id": "legendary-sword",
+    "name": "Legendary Sword",
+    "speed": "equip",
+    "text": "Equip only to a Warrior: it gains 300 ATK and DEF.",
+    "effect": {
+      "id": "equipAtk",
+      "params": {
+        "atk": 300,
+        "def": 300,
+        "types": "Warrior"
+      }
+    },
+    "palette": [
+      "#c9c9d2",
+      "#c9a34a",
+      "#3a5a9a"
+    ]
+  },
+  {
+    "kind": "spell",
+    "rarity": "common",
+    "id": "rush-recklessly",
+    "name": "Rush Recklessly",
+    "speed": "quick",
+    "text": "Target 1 face-up monster: it gains 700 ATK until the end of this turn. ARENA: +50% Power for 3 s.",
+    "effect": {
+      "id": "rushRecklessly",
+      "params": {
+        "atk": 700
+      }
+    },
+    "arenaUsable": true,
+    "arenaAbilities": [
+      {
+        "id": "reckless-rush",
+        "name": "Reckless Rush",
+        "kind": "buff",
+        "power": 0,
+        "cooldown": 0,
+        "duration": 3,
+        "magnitude": 1.5,
+        "description": "Your monster surges: +50% Power for 3 s."
+      }
+    ],
+    "palette": [
+      "#d03a2a",
+      "#f0a03a",
+      "#3a2a1a"
+    ]
+  },
+  {
+    "kind": "spell",
+    "rarity": "rare",
+    "id": "mystical-space-typhoon",
+    "name": "Mystical Space Typhoon",
+    "speed": "quick",
+    "text": "Target 1 Spell/Trap on the field; destroy it.",
+    "effect": {
+      "id": "destroyTargetSpellTrap"
+    },
+    "palette": [
+      "#3a9a6a",
+      "#a0e0c0",
+      "#1a3a2a"
+    ]
+  },
+  {
+    "kind": "spell",
+    "rarity": "common",
+    "id": "dian-keto-the-cure-master",
+    "name": "Dian Keto the Cure Master",
+    "speed": "normal",
+    "text": "Gain 1000 LP. ARENA: restore 30% of your monster's max HP.",
+    "effect": {
+      "id": "heal",
+      "params": {
+        "n": 1000
+      }
+    },
+    "arenaUsable": true,
+    "arenaAbilities": [
+      {
+        "id": "cure-master",
+        "name": "Cure Master",
+        "kind": "heal",
+        "power": 0,
+        "cooldown": 0,
+        "magnitude": 0.3,
+        "description": "Dian Keto restores 30% max HP."
+      }
+    ],
+    "palette": [
+      "#e8d070",
+      "#f0f0e0",
+      "#5a8ad0"
+    ]
+  },
+  {
+    "kind": "spell",
+    "rarity": "common",
+    "id": "ookazi",
+    "name": "Ookazi",
+    "speed": "normal",
+    "text": "Inflict 800 damage to your opponent. ARENA: hurl a huge fireball at the enemy.",
+    "effect": {
+      "id": "damage",
+      "params": {
+        "n": 800
+      }
+    },
+    "arenaUsable": true,
+    "arenaAbilities": [
+      {
+        "id": "great-fire",
+        "name": "Great Fire",
+        "kind": "projectile",
+        "power": 3,
+        "cooldown": 0,
+        "description": "A roaring fireball (2.5x your monster's Power)."
+      }
+    ],
+    "palette": [
+      "#f0a03a",
+      "#d03a2a",
+      "#3a1a1a"
+    ]
+  },
+  {
+    "kind": "trap",
+    "speed": "normal",
+    "rarity": "super",
+    "id": "mirror-force",
+    "name": "Mirror Force",
+    "text": "When an opponent's monster declares an attack: destroy all Attack Position monsters your opponent controls.",
+    "effect": {
+      "id": "destroyAttackPosition"
+    },
+    "palette": [
+      "#c9e8f8",
+      "#5a9ad8",
+      "#e8e8f0"
+    ]
+  },
+  {
+    "kind": "trap",
+    "speed": "normal",
+    "rarity": "common",
+    "id": "trap-hole",
+    "name": "Trap Hole",
+    "text": "When your opponent Normal Summons a monster with 1000 or more ATK: destroy it.",
+    "effect": {
+      "id": "destroySummoned",
+      "params": {
+        "minAtk": 1000
+      }
+    },
+    "palette": [
+      "#3a2a1a",
+      "#8a6a3a",
+      "#d03a3a"
+    ]
+  },
+  {
+    "kind": "trap",
+    "speed": "normal",
+    "rarity": "rare",
+    "id": "sakuretsu-armor",
+    "name": "Sakuretsu Armor",
+    "text": "When an opponent's monster declares an attack: destroy the attacking monster.",
+    "effect": {
+      "id": "destroyAttacker"
+    },
+    "palette": [
+      "#8a3a2a",
+      "#c9a34a",
+      "#3a3a4a"
+    ]
+  },
+  {
+    "kind": "trap",
+    "speed": "normal",
+    "rarity": "common",
+    "id": "negate-attack",
+    "name": "Negate Attack",
+    "text": "When an opponent's monster declares an attack: negate the attack and end the Battle Phase.",
+    "effect": {
+      "id": "negateAttack",
+      "params": {
+        "endBattlePhase": true
+      }
+    },
+    "palette": [
+      "#5a3a8a",
+      "#e8c84a",
+      "#1a1a2a"
+    ]
+  },
+  {
+    "kind": "trap",
+    "speed": "normal",
+    "rarity": "common",
+    "id": "waboku",
+    "name": "Waboku",
+    "text": "When an opponent's monster declares an attack: for the rest of this turn you take no battle damage and your monsters cannot be destroyed by battle.",
+    "effect": {
+      "id": "waboku"
+    },
+    "palette": [
+      "#e8e0c8",
+      "#5a8a5a",
+      "#8a5a3a"
+    ]
+  },
+  {
+    "kind": "trap",
+    "speed": "normal",
+    "rarity": "super",
+    "id": "magic-cylinder",
+    "name": "Magic Cylinder",
+    "text": "When an opponent's monster declares an attack: negate the attack and inflict damage to your opponent equal to its ATK.",
+    "effect": {
+      "id": "magicCylinder"
+    },
+    "palette": [
+      "#3a3a5a",
+      "#d0d0d8",
+      "#c9a34a"
+    ]
+  },
+  {
+    "kind": "trap",
+    "speed": "continuous",
+    "rarity": "rare",
+    "id": "spellbinding-circle",
+    "name": "Spellbinding Circle",
+    "text": "Target 1 monster your opponent controls: it cannot attack or change its battle position.",
+    "effect": {
+      "id": "spellbindingCircle"
+    },
+    "palette": [
+      "#3a1a4a",
+      "#e06ab0",
+      "#f0e04a"
+    ]
+  }
+]
