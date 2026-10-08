@@ -508,7 +508,8 @@ export class DuelEngine {
 
     if (targetUid === null) {
       const atk = this.getEffectiveAtk(attackerUid);
-      this.changeLp(opp, -atk);
+      if (this.hasFlag(opp, 'noBattleDamage')) this.log('No battle damage is taken.');
+      else this.changeLp(opp, -atk);
       if (s.winner === null) {
         const info: BattleInfo = {
           attackerUid, attackerPlayer: player, defenderUid: null, defenderPlayer: opp,

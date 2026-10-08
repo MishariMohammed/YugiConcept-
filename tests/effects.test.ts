@@ -258,6 +258,17 @@ describe('traps', () => {
     expect(lp(e, 1)).toBe(4000);
   });
 
+  it('waboku also prevents direct attack damage', () => {
+    const e = mk();
+    const a = place(e, 0, 'vorse-raider'), b = place(e, 0, 'battle-ox');
+    setCard(e, 1, 'waboku');
+    turn3(e);
+    e.apply({ type: 'enterBattle' });
+    attack(e, a, null);
+    attack(e, b, null);
+    expect(lp(e, 1)).toBe(4000);
+  });
+
   it("magicCylinder negates and deals the attacker's ATK to its controller", () => {
     const e = mk();
     const a = place(e, 0, 'vorse-raider');
