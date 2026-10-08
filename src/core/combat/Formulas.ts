@@ -53,7 +53,7 @@ export const TUNING = {
      */
     statExp: 1.4,
     hpBase: 50,
-    hpScale: 480,
+    hpScale: 640,
     hpAtkWeight: 0.7,
     hpDefWeight: 0.3,
     powerBase: 2,
@@ -82,13 +82,97 @@ export const TUNING = {
     suddenDeathRampFrac: 0.04,
     /** Simultaneous KOs within this window count as a draw. */
     drawWindowSec: 0.1,
+
+    /**
+     * Real-time simulation constants (src/core/combat/ArenaSim.ts). World units = arena px.
+     * [Arena dev addition] Measured/tuned with `npm run sim` (tools/balance-sim.ts).
+     */
+    sim: {
+      /** Arena floor size in world units (rendered 1:1 inside the 480x270 screen). */
+      width: 400,
+      height: 180,
+      /** Centre distance between the fighters at the start. */
+      spawnGap: 170,
+      /** Collision radius; level >= 7 monsters are bigger. */
+      bodyRadius: 10,
+      bodyRadiusBig: 11,
+      /** Melee basic attack: wind-up before the strike lands (dodgeable), extra reach at strike time. */
+      meleeWindupSec: 0.15,
+      meleeReachSlack: 6,
+      /** Movement multiplier while winding up an attack/ability. */
+      windupMoveMult: 0.4,
+      /** Projectile speeds (px/s): basic ranged attack, ability bolt, arena-spell bolt. */
+      basicProjectileSpeed: 320,
+      abilityProjectileSpeed: 260,
+      spellProjectileSpeed: 300,
+      projectileRadius: 4,
+      spellProjectileRadius: 7,
+      /** Projectiles vanish after travelling this far. */
+      projectileMaxRange: 300,
+      /** Ranged basic attacks may be fired a bit beyond the nominal range (the bolt keeps flying). */
+      rangedFireSlack: 10,
+      /** Firing a ranged basic roots the shooter briefly, so kiting can't outrun melee forever. */
+      rangedFireRootSec: 0.45,
+      /** Basic bolts lead the target's current velocity by this fraction (1 = perfect linear lead). */
+      basicLeadFrac: 1.0,
+      /** Dash: crouch tell (dashWindupSec, rooted), then lunge dashDistance in dashSec; invulnerable
+       *  during the lunge; hits once on contact. The direction is locked at cast, so moving dodges it. */
+      dashWindupSec: 0.12,
+      dashDistance: 90,
+      dashSec: 0.2,
+      dashContactSlack: 6,
+      /** AOE: radius around the caster, after a telegraphed wind-up. */
+      aoeRadius: 42,
+      aoeWindupSec: 0.45,
+      /** Spell AOE (e.g. Fissure): erupts under the enemy's position after a wind-up (dodgeable). */
+      spellAoeRadius: 38,
+      spellAoeWindupSec: 0.5,
+      /** Stun strike for non-ranged styles: reach = style range + stunReachBonus, after a wind-up. */
+      stunReachBonus: 16,
+      stunWindupSec: 0.2,
+      /** Stun spells (no damage) land after this delay and cannot be dodged (orange-card special). */
+      spellStunDelaySec: 0.25,
+      /** Knockback impulse (px/s) on a landed hit, multiplied by sqrt(hit multiplier); decays per second. */
+      knockback: 130,
+      knockbackDecay: 9,
+      /** Basic hits use this fraction of the knockback (abilities use sqrt(power)). */
+      basicKnockbackMult: 0,
+      /** Invulnerability after taking a hit (sudden death ignores it). */
+      iframeSec: 0.2,
+      /** Each basic-attack interval is scaled by 1 +- attackJitter (desyncs mirror trades). */
+      attackJitter: 0.12,
+      /** Damage variance: each landed hit is scaled by 1 +- hitVariance. */
+      hitVariance: 0.1,
+      /** Abilities start the fight at this fraction of their cooldown (GDD 3.5: half). */
+      abilityStartCdFrac: 0.5,
+      /** +- random offset on that start fraction, so mirrored abilities don't fire in the same tick. */
+      abilityStartJitter: 0.12,
+      /** First basic attack can't happen before this (s) - lets the intro breathe. */
+      firstAttackDelaySec: 0.3,
+      /** Sudden death: the arena walls close in by this fraction of each axis over shrinkSec. */
+      suddenDeathShrink: 0.35,
+      suddenDeathShrinkSec: 6,
+    },
+
+    /**
+     * Human skill profiles for ArenaAI when it auto-plays the HUMAN side (headless sims, Auto button).
+     * Same shape as TUNING.ai. leadFrac: how much the controller leads moving targets with skill shots.
+     */
+    playerSkill: {
+      novice:  { reactionMs: 480, aimErrorDeg: 14, abilityUseChance: 0.5,  dodgeChance: 0.15, leadFrac: 0.0 },
+      average: { reactionMs: 340, aimErrorDeg: 9,  abilityUseChance: 0.7,  dodgeChance: 0.3,  leadFrac: 0.3 },
+      good:    { reactionMs: 250, aimErrorDeg: 5,  abilityUseChance: 0.85, dodgeChance: 0.45, leadFrac: 0.6 },
+      expert:  { reactionMs: 190, aimErrorDeg: 3,  abilityUseChance: 0.95, dodgeChance: 0.6,  leadFrac: 0.8 },
+    },
+    /** leadFrac for the NPC difficulties (TUNING.ai has the rest). */
+    aiLeadFrac: { easy: 0.0, normal: 0.4, hard: 0.7 },
   },
 
   styles: {
     melee:   { speed: 95,  range: 30,  attackInterval: 0.9, hpMult: 1.0,  powerMult: 1.03 },
-    ranged:  { speed: 80,  range: 150, attackInterval: 1.2, hpMult: 0.95, powerMult: 1.3 },
-    bruiser: { speed: 65,  range: 36,  attackInterval: 1.4, hpMult: 1.15, powerMult: 1.3 },
-    swift:   { speed: 130, range: 26,  attackInterval: 0.6, hpMult: 0.85, powerMult: 0.76 },
+    ranged:  { speed: 70,  range: 150, attackInterval: 1.2, hpMult: 0.95, powerMult: 1.25 },
+    bruiser: { speed: 82,  range: 36,  attackInterval: 1.4, hpMult: 1.15, powerMult: 1.38 },
+    swift:   { speed: 130, range: 26,  attackInterval: 0.6, hpMult: 0.95, powerMult: 0.78 },
   } satisfies Record<ArenaStyle, StyleProfile>,
 
   // ---------------- Battle resolution ----------------
