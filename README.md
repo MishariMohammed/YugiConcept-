@@ -90,7 +90,19 @@ Short chiptune effects are generated with WebAudio in `src/fx/Sfx.ts`. Browsers 
 
 ## Android
 
-There are two ways to get the game onto an Android phone.
+There are three ways to get the game onto an Android phone.
+
+### Easiest: download the ready-made APK
+
+Every push to `main` or `claude/serene-sagan-y1h36q` runs a GitHub Actions workflow (`.github/workflows/android-apk.yml`) that builds a debug-signed APK and attaches it to the rolling **`apk-latest`** release:
+
+<https://github.com/MishariMohammed/YugiConcept-/releases/tag/apk-latest>
+
+1. On your phone, open that link and download **`YugiConcept-debug.apk`**.
+2. Open the downloaded file. If Android asks, allow your browser or Files app to **Install unknown apps**.
+3. Tap **Install**, then launch **YugiConcept**.
+
+Every build is signed with the CI runner's temporary debug key, which changes between builds. If installing a newer build fails with "App not installed", uninstall the old version first. You can also re-run the build manually from the repo's **Actions** tab (*Android APK → Run workflow*).
 
 ### Option A: no SDK needed, "Add to Home Screen" (quickest)
 

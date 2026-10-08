@@ -1,0 +1,72 @@
+name: Android APK
+
+on:
+  push:
+    branches: [main, claude/serene-sagan-y1h36q]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0" "platform-tools"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build web game
+        run: npm run build
+
+      - name: Sync Capacitor Android project
+        run: npx cap sync android
+
+      - name: Build debug APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Rename APK
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk YugiConcept-debug.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: YugiConcept-debug-apk
+          path: YugiConcept-debug.apk
+
+      - name: Publish to rolling "apk-latest" release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: apk-latest
+          target_commitish: ${{ github.sha }}
+          name: YugiConcept APK (latest build)
+          prerelease: true
+          make_latest: false
+          body: |
+            Debug-signed APK built from `${{ github.ref_name }}` @ ${{ github.sha }}.
+            Install: download `YugiConcept-debug.apk` on your Android phone, open it, and allow "Install unknown apps" when asked.
+            Personal use only — not for distribution.
+          files: YugiConcept-debug.apk
