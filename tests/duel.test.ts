@@ -2,6 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { getCard, registerCards } from '../src/core/cards/CardDB';
 import { DuelEngine, type ResolveBattleFn } from '../src/core/duel/DuelEngine';
 import { Rng } from '../src/core/rng';
+import { RULES } from '../src/core/duel/Rules';
+import { directAttackDamage } from '../src/core/combat/Formulas';
+
+const LP0 = RULES.startingLp;
 import type { ArenaResult, CardDef, DuelAction, DuelEvent } from '../src/core/types';
 
 // ---- fixtures -------------------------------------------------------------
@@ -80,7 +84,7 @@ describe('turn flow', () => {
     expect(e.state.phase).toBe('main');
     expect(e.state.players[0].hand).toHaveLength(5);
     expect(e.state.players[1].hand).toHaveLength(5);
-    expect(e.state.players[0].lp).toBe(4000);
+    expect(e.state.players[0].lp).toBe(LP0);
     const acts = e.legalActions(0);
     expect(acts.some((a) => a.type === 'enterBattle')).toBe(false);
     expect(e.legalActions(1)).toEqual([]);
@@ -199,7 +203,7 @@ describe('battle', () => {
     const out = e.resolveArena(win('attacker'));
     expect(e.pendingArena).toBeNull();
     expect(monsterUids(e, 1)).toEqual([]);
-    expect(e.state.players[1].lp).toBe(3500);
+    expect(e.state.players[1].lp).toBe(LP0 - 500);
     expect(out.some((v) => v.type === 'destroy' && v.uid === def)).toBe(true);
     // attacker already attacked
     expect(e.legalActions(0).some((a) => a.type === 'declareAttack')).toBe(false);
@@ -211,7 +215,7 @@ describe('battle', () => {
     e.resolveArena(win('defender'));
     expect(monsterUids(e, 0)).toEqual([]);
     expect(monsterUids(e, 1)).toHaveLength(1);
-    expect(e.state.players[0].lp).toBe(3500);
+    expect(e.state.players[0].lp).toBe(LP0 - 500);
   });
 
   it('arena spells used go to the graveyard', () => {
@@ -229,7 +233,8 @@ describe('battle', () => {
   });
 
   it('direct attack resolves immediately and can win the duel', () => {
-    const e = mk(['t-lv5'], [], { startingLp: 2000 });
+    const D = directAttackDamage(1000); // t-low has 1000 ATK; direct attacks deal ATK x directAttackMult
+    const e = mk(['t-lv5'], [], { startingLp: 2 * D });
     endTurn(e);
     endTurn(e);
     // put a level-5 down without tributes is illegal; use a low monster instead
@@ -238,8 +243,8 @@ describe('battle', () => {
     const att = monsterUids(e, 0)[0];
     const evs = e.apply({ type: 'declareAttack', attackerUid: att, targetUid: null });
     expect(e.pendingArena).toBeNull();
-    expect(e.state.players[1].lp).toBe(1000);
-    expect(evs.some((v) => v.type === 'lp' && v.delta === -1000)).toBe(true);
+    expect(e.state.players[1].lp).toBe(D);
+    expect(evs.some((v) => v.type === 'lp' && v.delta === -D)).toBe(true);
     endTurn(e); endTurn(e);
     e.apply({ type: 'enterBattle' });
     e.apply({ type: 'declareAttack', attackerUid: att, targetUid: null });
@@ -260,7 +265,7 @@ describe('battle', () => {
     expect(e.pendingArena!.defender.defStat).toBe(2000);
     expect(e.state.players[1].monsters.find((m) => m?.card.uid === def)!.faceDown).toBe(false);
     e.resolveArena(win('attacker'));
-    expect(e.state.players[1].lp).toBe(4000); // no damage through defense
+    expect(e.state.players[1].lp).toBe(LP0); // no damage through defense
   });
 
   it('uses Formulas.resolveBattle by default', () => {
@@ -273,7 +278,7 @@ describe('battle', () => {
     e.apply({ type: 'declareAttack', attackerUid: monsterUids(e, 0)[0], targetUid: monsterUids(e, 1)[0] });
     e.resolveArena(win('attacker'));
     expect(monsterUids(e, 1)).toEqual([]);
-    expect(e.state.players[1].lp).toBeLessThan(4000);
+    expect(e.state.players[1].lp).toBeLessThan(LP0);
   });
 });
 
@@ -304,7 +309,7 @@ describe('spells', () => {
     expect(acts.some((a) => a.type === 'activateSpell' && a.handUid === handUid(e, 0, 't-burn'))).toBe(true);
     expect(acts.some((a) => a.type === 'activateSpell' && a.handUid === handUid(e, 0, 't-pot'))).toBe(false);
     e.apply({ type: 'activateSpell', handUid: handUid(e, 0, 't-burn') });
-    expect(e.state.players[1].lp).toBe(3500);
+    expect(e.state.players[1].lp).toBe(LP0 - 500);
   });
 
   it('Raigeki needs opponent monsters; Fissure needs a valid target', () => {

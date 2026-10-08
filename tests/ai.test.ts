@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, it } from 'vitest';
+import { directAttackDamage } from '../src/core/combat/Formulas';
 import { loadDefaultCards } from '../src/core/cards/CardDB';
 import { DuelEngine } from '../src/core/duel/DuelEngine';
 import {
@@ -87,7 +88,7 @@ describe('DuelAI scenarios', () => {
       const bewd = place(e, 1, 'blue-eyes-white-dragon');
       const xhead = place(e, 1, 'x-head-cannon');
       const guardian = place(e, 0, 'celtic-guardian', 'defense'); // 1400/1200 in DEF
-      e.state.players[0].lp = 3000;
+      e.state.players[0].lp = directAttackDamage(3000) - 100; // BEWD direct = 3000 x directAttackMult
       const acts = playTurn(e, 1, d);
       const attacks = acts.filter((a) => a.type === 'declareAttack');
       expect(attacks[0], d).toEqual({ type: 'declareAttack', attackerUid: xhead, targetUid: guardian });
@@ -101,7 +102,7 @@ describe('DuelAI scenarios', () => {
       const e = blankDuel();
       place(e, 1, 'vorse-raider');
       place(e, 1, 'battle-ox');
-      e.state.players[0].lp = 3500;
+      e.state.players[0].lp = directAttackDamage(1900) + directAttackDamage(1700) - 100;
       playTurn(e, 1, d);
       expect(e.state.winner, d).toBe(1);
     }

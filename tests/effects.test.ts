@@ -5,6 +5,10 @@ import { getCard, registerCards } from '../src/core/cards/CardDB';
 import { allEffectIds } from '../src/core/cards/EffectRegistry';
 import { DuelEngine, type ResolveBattleFn } from '../src/core/duel/DuelEngine';
 import type { ArenaResult, CardDef, DuelAction, PlayerId, Position } from '../src/core/types';
+import { RULES } from '../src/core/duel/Rules';
+import { directAttackDamage } from '../src/core/combat/Formulas';
+
+const LP0 = RULES.startingLp;
 
 const CARDS = cardsJson as CardDef[];
 registerCards(CARDS);
@@ -90,13 +94,13 @@ describe('spells', () => {
   it('damage (Ookazi) deals 800 to the opponent', () => {
     const e = mk();
     activate(e, give(e, 0, 'ookazi'));
-    expect(lp(e, 1)).toBe(3200);
+    expect(lp(e, 1)).toBe(LP0 - 800);
   });
 
   it('heal (Dian Keto) gains 1000 LP', () => {
     const e = mk();
     activate(e, give(e, 0, 'dian-keto-the-cure-master'));
-    expect(lp(e, 0)).toBe(5000);
+    expect(lp(e, 0)).toBe(LP0 + 1000);
   });
 
   it('destroyAllOpponentMonsters (Raigeki) clears only the opponent', () => {
@@ -199,7 +203,7 @@ describe('traps', () => {
     e.apply({ type: 'enterBattle' });
     attack(e, a, null);
     expect([onField(e, a), onField(e, b), onField(e, c)]).toEqual([false, false, true]);
-    expect(lp(e, 1)).toBe(4000);
+    expect(lp(e, 1)).toBe(LP0);
   });
 
   it('destroyAttacker (Sakuretsu Armor) destroys the attacker', () => {
@@ -210,7 +214,7 @@ describe('traps', () => {
     e.apply({ type: 'enterBattle' });
     attack(e, a, null);
     expect(onField(e, a)).toBe(false);
-    expect(lp(e, 1)).toBe(4000);
+    expect(lp(e, 1)).toBe(LP0);
   });
 
   it('destroySummoned (Trap Hole) hits a summon with ATK >= 1000 only', () => {
@@ -232,7 +236,7 @@ describe('traps', () => {
     turn3(e);
     e.apply({ type: 'enterBattle' });
     attack(e, a, null);
-    expect(lp(e, 1)).toBe(4000);
+    expect(lp(e, 1)).toBe(LP0);
     expect(has(e.legalActions(0), (x) => x.type === 'declareAttack')).toBe(false);
     expect(() => attack(e, b, null)).toThrow(/Battle Phase/);
     endTurn(e); endTurn(e); // battle works again next turn
@@ -251,11 +255,11 @@ describe('traps', () => {
     expect(e.pendingArena).not.toBeNull();
     e.resolveArena(win('attacker'));
     expect(onField(e, d1)).toBe(true);
-    expect(lp(e, 1)).toBe(4000);
+    expect(lp(e, 1)).toBe(LP0);
     attack(e, b, d1); // still protected for the rest of the turn
     e.resolveArena(win('attacker'));
     expect(onField(e, d1)).toBe(true);
-    expect(lp(e, 1)).toBe(4000);
+    expect(lp(e, 1)).toBe(LP0);
   });
 
   it('waboku also prevents direct attack damage', () => {
@@ -266,7 +270,7 @@ describe('traps', () => {
     e.apply({ type: 'enterBattle' });
     attack(e, a, null);
     attack(e, b, null);
-    expect(lp(e, 1)).toBe(4000);
+    expect(lp(e, 1)).toBe(LP0);
   });
 
   it("magicCylinder negates and deals the attacker's ATK to its controller", () => {
@@ -276,8 +280,8 @@ describe('traps', () => {
     turn3(e);
     e.apply({ type: 'enterBattle' });
     attack(e, a, null);
-    expect(lp(e, 0)).toBe(4000 - 1900);
-    expect(lp(e, 1)).toBe(4000);
+    expect(lp(e, 0)).toBe(LP0 - 1900);
+    expect(lp(e, 1)).toBe(LP0);
   });
 
   it('spellbindingCircle locks the target and leaves with it', () => {
@@ -334,7 +338,7 @@ describe('monster effects', () => {
     attack(e, a, k);
     e.resolveArena(win('attacker'));
     expect(onField(e, k)).toBe(false);
-    expect(lp(e, 1)).toBe(4000);
+    expect(lp(e, 1)).toBe(LP0);
   });
 
   it('switchToAttackAfterAttacked (Big Shield Gardna) goes to Attack Position after surviving', () => {
@@ -357,7 +361,7 @@ describe('monster effects', () => {
     e.apply({ type: 'enterBattle' });
     attack(e, sd, elf);
     e.resolveArena(win('attacker'));
-    expect(lp(e, 1)).toBe(4000 - (1900 - 1500));
+    expect(lp(e, 1)).toBe(LP0 - (1900 - 1500));
     expect(slot(e, sd).position).toBe('defense');
   });
 
@@ -367,7 +371,7 @@ describe('monster effects', () => {
     turn3(e);
     e.apply({ type: 'enterBattle' });
     attack(e, sd, null);
-    expect(lp(e, 1)).toBe(2100);
+    expect(lp(e, 1)).toBe(LP0 - directAttackDamage(1900));
     expect(slot(e, sd).position).toBe('defense');
   });
 

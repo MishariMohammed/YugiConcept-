@@ -1,4 +1,5 @@
 // Starter decks. Each deck is exactly 30 card ids (max 3 copies), validated by tools/validate-cards.ts.
+// Wave 3 (Mechanics): rebalanced toward 45-55% Kaiba win rate at equal AI difficulty (see docs/GDD.md 7).
 
 export type DeckId = 'yugi' | 'kaiba';
 
@@ -22,8 +23,8 @@ export const DECKS: Record<DeckId, string[]> = {
     'feral-imp',
     'mystical-elf',
     'breaker-the-magical-warrior',
-    'silver-fang',
-    'mammoth-graveyard',
+    'beta-the-magnet-warrior', // wave 3 balance: was silver-fang (1200/800)
+    'breaker-the-magical-warrior', // wave 3 balance: was mammoth-graveyard (1200/800)
     // Spells (9)
     'pot-of-greed',
     'dark-hole',
@@ -61,10 +62,10 @@ export const DECKS: Record<DeckId, string[]> = {
     'y-dragon-head',
     'z-metal-tank',
     'spear-dragon',
-    'krokodilus',
+    'x-head-cannon', // wave 3 balance: was krokodilus (1100/1200)
     // Spells (8)
     'pot-of-greed',
-    'raigeki',
+    'dark-hole', // wave 3 balance: was raigeki (one-sided wipe swung ~10% of games)
     'fissure',
     'monster-reborn',
     'ookazi',

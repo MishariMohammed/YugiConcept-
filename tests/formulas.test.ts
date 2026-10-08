@@ -50,10 +50,17 @@ describe('arenaStats monotonicity', () => {
     const p0 = arenaStats(c, 1500, 0).power;
     for (let def = 0; def <= 4000; def += 250) {
       const s = arenaStats(c, 1500, def);
-      expect(s.maxHp).toBeGreaterThan(prevH);
+      // Below the HP DEF floor (ATK x hpDefFloorFrac) HP is flat; above it strictly increasing.
+      if (def > 1500 * TUNING.arena.hpDefFloorFrac) expect(s.maxHp).toBeGreaterThan(prevH);
+      else expect(s.maxHp).toBeGreaterThanOrEqual(prevH);
       expect(s.power).toBeCloseTo(p0);
       prevH = s.maxHp;
     }
+  });
+  it('glass cannons get the HP DEF floor but no resistance from it', () => {
+    const spear = arenaStats(c, 1900, 0), floor = arenaStats(c, 1900, 1900 * TUNING.arena.hpDefFloorFrac);
+    expect(spear.maxHp).toBe(floor.maxHp);
+    expect(spear.def).toBe(0);
   });
   it('higher DEF -> more resistance', () => {
     let prev = Infinity;
@@ -204,12 +211,13 @@ describe('duel helpers', () => {
     expect(tributesRequired(7)).toBe(2);
     expect(tributesRequired(8)).toBe(2);
   });
-  it('direct attack = ATK', () => {
-    expect(directAttackDamage(1800)).toBe(1800);
+  it('direct attack = ATK x directAttackMult, rounded', () => {
+    expect(directAttackDamage(1800)).toBe(Math.round((1800 * TUNING.battle.directAttackMult) / 10) * 10);
+    expect(directAttackDamage(3000)).toBeLessThanOrEqual(3000);
     expect(directAttackDamage(-5)).toBe(0);
   });
   it('starting values', () => {
-    expect(TUNING.duel.startingLp).toBe(4000);
+    expect(TUNING.duel.startingLp).toBe(8000);
     expect(TUNING.duel.deckSize).toBe(30);
     expect(TUNING.duel.openingHand).toBe(5);
     expect(TUNING.duel.handLimit).toBe(6);

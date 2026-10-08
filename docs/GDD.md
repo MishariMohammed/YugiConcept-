@@ -2,7 +2,9 @@
 
 > **Private and personal use only.** It uses real Yu-Gi-Oh! card names and stats as text data and has no official artwork.
 > The numbers in this document live in `src/core/combat/Formulas.ts` → `TUNING`. When the two disagree, the code wins.
-> The balance model is `npx tsx tools/arena-model.ts`.
+> The balance tools are:
+> - `npm run sim` (`tools/balance-sim.ts`): the real ArenaSim and ArenaAI, plus whole duels with DuelAI. It is the source of truth.
+> - `npx tsx tools/arena-model.ts`: the original abstract model, kept for quick what-ifs.
 
 ## 1. Pitch
 YugiConcept is a streamlined 1v1 Yu-Gi-Oh! duel against an NPC. When a monster attacks another monster, a **short real-time arena fight** (8–15 s) decides the battle:
@@ -11,7 +13,7 @@ YugiConcept is a streamlined 1v1 Yu-Gi-Oh! duel against an NPC. When a monster a
 - Card effects become arena abilities.
 - Stats dominate the outcome, but skill can swing close fights.
 
-A whole match lasts **8–12 minutes** and includes about **5–8 arena fights**.
+A whole match lasts **8–12 minutes** and includes about **5–8 arena fights**. Measured in Wave 3: a median of 8.4 min with 7 fights (Section 7).
 
 ---
 
@@ -20,7 +22,7 @@ A whole match lasts **8–12 minutes** and includes about **5–8 arena fights**
 ### 2.1 Setup
 | Item | Value |
 |---|---|
-| Starting LP | **4000** |
+| Starting LP | **8000** (Wave 3: 4000 gave 3–4 min matches; see Section 7) |
 | Deck | **30** cards (max 3 copies) |
 | Opening hand | **5** |
 | Hand limit | **6**: at End Phase, discard down to 6 |
@@ -84,9 +86,11 @@ Damage is rounded to the nearest 10.
 | Defense | Defender wins, DEF = ATK | destroyed | survives | attacking player: `100 × perf(hD)` |
 | Defense | Defender wins, DEF < ATK (upset) | destroyed | survives | attacking player: `max(100, |gap|·0.5) × perf(hD)` |
 | Defense | **Draw** | survives | survives | none (YGO ATK = DEF rule) |
-| — | Direct attack (no arena) | — | — | defending player: attacker's ATK, no multiplier |
+| — | Direct attack (no arena) | — | — | defending player: **ATK × 0.4** (`directAttackMult`), rounded to 10, no performance multiplier |
 
 **The defending player never takes damage while their monster is in Defense Position.**
+
+**Why direct attacks deal ×0.4.** With full-ATK direct attacks, 64% of all LP damage came from direct hits, and matches ended in 3 min. Softening direct attacks keeps matches in the target window. With 8000 LP, a Blue-Eyes direct attack deals 1200 (15% of LP). The real game's 3000 of 8000 is 37.5%. DuelAI's lethal and threat math uses the same multiplier.
 
 This mapping is implemented by `resolveBattle(attackerAtk, {atk, def, position}, arenaResult)`. It returns `{attackerDestroyed, defenderDestroyed, lpDamage: [toAttackingPlayer, toDefendingPlayer]}`.
 
@@ -117,40 +121,45 @@ Either player's monster can be the "player-controlled" one: the human always con
 ### 3.2 Stats (from current ATK/DEF, after modifiers)
 `arenaStats(card, atk, def, position?)`:
 ```
-S      = 0.7·ATK + 0.3·DEF
-maxHp  = (50 + 480·(S/1000)^1.4)  × style.hpMult
-power  = (2  + 60 ·(ATK/1000)^1.4) × style.powerMult   // damage per basic hit
-hit    = power × mult × 8000/(8000+targetDEF)           // resistance from DEF
-hit    = clamp(hit, 4, 0.16·target.maxHp·max(1,mult))   // floor and anti-oneshot cap
+S      = 0.7·ATK + 0.3·max(DEF, 0.5·ATK)                // HP DEF floor (Wave 3)
+maxHp  = (50 + 640·(S/1000)^1.0)  × style.hpMult
+power  = (2  + 60 ·(ATK/1000)^1.0) × style.powerMult      // damage per basic hit
+hit    = power × mult × 8000/(8000+targetDEF)             // resistance from the REAL DEF
+hit    = clamp(hit, 4, 0.16·target.maxHp·max(1,mult))     // floor and anti-oneshot cap
 ```
 - A **Defense-Position defender uses its DEF as its offensive stat**: its "ATK" in the arena is its DEF, because DEF is its YGO battle stat. That is why a 0/2000 wall hits back hard.
-- **Why the exponent 1.4?** Both HP and power grow with ATK, so the damage race scales with roughly `(ATK ratio)^2.8`. This keeps a −500 ATK gap decisive at *every* level, both 1700 vs 1200 and 2500 vs 2000. Mirror matches still take about the same time at every level, because HP and power scale together.
-- **DEF matters, but less than ATK**: about 1000 DEF is worth about 250–300 ATK in an Attack-Position fight. This keeps arena outcomes consistent with YGO's ATK-vs-ATK rule.
+- **Why `statExp` is 1.0 (it was 1.4 in Wave 1).**
+  - The abstract model assumed hits land randomly (a per-side hit rate). In the real ArenaSim, melee trades land about 95% of the time, so the race is close to deterministic, and with exponent 1.4 any stat gap was absolute: −200 gaps almost never flipped.
+  - At 1.0, HP and power are both linear in ATK, so the race still scales with roughly `(ATK ratio)^2`. A −500 gap remains decisive, while −200 gaps and DEF differences can now swing fights.
+- **HP DEF floor (Wave 3).** For HP only, DEF counts as at least half of ATK. Spear Dragon (1900/0) used to lose 55–75% of its fights against 1400–1500 ATK monsters; resistance still uses its real DEF of 0.
+- **DEF matters, but less than ATK**: about 1000 DEF is worth about 300 ATK in an Attack-Position fight.
+- `hpScale` is 640, raised from 480 by the Arena developer, so real-sim fights land around 10 s.
 
 Sample values (melee style; the last column is a basic hit against DEF 1200):
 
 | ATK/DEF | maxHp | power | hit vs DEF 1200 |
 |---|---|---|---|
-| 0/2000 | 285 | 2 | 4 (floor) |
-| 800/600 | 365 | 47 | 41 |
-| 1200/1200 | 670 | 82 | 71 |
-| 1500/1200 | 827 | 111 | 97 |
-| 1700/1200 | 937 | 132 | 115 |
-| 2000/1500 | 1186 | 165 | 144 |
-| 2500/2000 | 1638 | 225 | 196 |
-| 3000/2500 | 2130 | 290 | 252 |
+| 0/2000 | 434 | 2 | 4 (floor) |
+| 800/600 | 524 | 52 | 45 |
+| 1200/1200 | 818 | 76 | 66 |
+| 1500/1200 | 952 | 95 | 82 |
+| 1700/1200 | 1042 | 107 | 93 |
+| 1900/0 (Spear Dragon, floored) | 1084 | 119 | 104 |
+| 2000/1500 | 1234 | 126 | 109 |
+| 2500/2000 | 1554 | 157 | 136 |
+| 3000/2500 | 1874 | 187 | 163 |
 
 ### 3.3 Styles
-The arena is 480×270 px.
+The values below were tuned by the Arena developer against the real sim. The arena floor is 400×180 world units inside the 480×270 screen.
 
 | Style | Speed px/s | Range px | Attack interval s | hpMult | powerMult | Feel |
 |---|---|---|---|---|---|---|
 | melee | 95 | 30 | 0.9 | 1.00 | 1.03 | All-rounder that closes in and trades |
-| ranged | 80 | 150 | 1.2 | 0.95 | 1.30 | Projectiles you can dodge; kites |
-| bruiser | 65 | 36 | 1.4 | 1.15 | 1.30 | Slow, tanky, heavy hits |
-| swift | 130 | 26 | 0.6 | 0.85 | 0.76 | Fast, hard to hit, chip damage |
+| ranged | 70 | 150 | 1.2 | 0.95 | 1.25 | Projectiles you can dodge; kites. The shooter is rooted for 0.45 s per shot. |
+| bruiser | 82 | 36 | 1.4 | 1.15 | 1.38 | Slow, tanky, heavy hits |
+| swift | 130 | 26 | 0.6 | 0.95 | 0.78 | Fast, chip damage |
 
-At equal stats and equal skill, the cross-style win rates in the model stay between **42% and 57%** (see 6.3).
+The constants of the real-time sim live in `TUNING.arena.sim`: wind-ups, projectile speeds, dash and aoe sizes, knockback, i-frames, sudden-death shrink. Human skill profiles for headless sims are in `TUNING.arena.playerSkill`. At equal stats and equal skill, the cross-style win rates in the real sim stay between **36% and 63%** (Section 6.3).
 
 ### 3.4 MonsterType → ArenaStyle
 `styleForType(type)`; `CardDef.arenaStyle` overrides it.
@@ -234,10 +243,11 @@ Assumed player hit rates for the model: novice 0.60, average 0.72, good 0.82, ex
 - The NPC's turn is about 6–10 s, plus its fights.
 - Over 14–18 total turns with about 5–8 fights, the match takes **about 8–12 min**.
 
-**LP economy:**
-- Typical gap damage per fight is 200–700 × about 1.1.
-- Direct attacks deal 1000–2500.
-- So 4000 LP falls in about 2 direct hits plus 3–4 lost fights, which matches the target length.
+**LP economy (Wave 3, measured):**
+- Starting LP is 8000.
+- Direct attacks deal ATK × 0.4, about 500–1200 each.
+- Arena fights deal gap × perf, about 200–700 each.
+- In a normal-vs-normal match there are about 10 direct attacks and 7 fights. About 22% of LP damage comes from the arena and the rest from direct attacks and burn effects. See Section 7.
 
 ---
 
@@ -298,73 +308,122 @@ Hard caps: power ≤ 3.0, stun ≤ 1.0 s, shield ≤ 0.6, heal ≤ 30% maxHp, bu
 
 ---
 
-## 6. Balance model results
-These results come from `tools/arena-model.ts` (6000 fights per cell, seeded).
-
-The model is an abstraction:
-- Movement becomes an engage delay per style.
-- Aim and dodging become one hit rate per side.
-- Each side also uses its default ability on cooldown.
-- Hits have ±10% variance and attack intervals have ±10% jitter.
+## 6. Arena balance (real ArenaSim, Wave 3)
+These numbers come from `npm run sim`: 400 fights per cell, with ArenaAI driving both sides and the "human" side using `TUNING.arena.playerSkill`. The Wave 1 abstract-model table is superseded; `tools/arena-model.ts` remains for quick what-ifs only.
 
 **"Upset"** = the weaker side B wins.
 
-### 6.1 Win rates and durations
-| Matchup (A vs B) | Equal skill (0.72/0.72) | Weaker = good player vs normal AI (0.68/0.82) | Weaker = good vs hard AI (0.78/0.82) | Stronger = novice vs normal AI (0.60/0.68) |
-|---|---|---|---|---|
-| 1200/1200 vs 1200/1200 (mirror) | 49% (draw 1%) | 77% | 59% | 66% (novice A loses) |
-| 1700/1200 vs 1200/1200 (−500) | 1% | 3% | 0% | 3% |
-| 1800/1000 vs 1300/2000 (−500, high DEF) | 8% | 24% | 9% | 22% |
-| 2500/2100 vs 2000/2100 (−500, ranged) | 11% | **25%** | 12% | 22% |
-| 2500/2000 vs 2000/2000 (−500, bruisers) | 3% | 11% | 4% | 11% |
-| 1500/1200 vs 1300/1100 (−200) | 12% | 30% | 14% | 25% |
-| 3000/2500 vs Defense-Position 1400 DEF | 0% | 0% | 0% | 0% |
-| 1800/1000 vs Defense-Position 2000 DEF wall | 91% (the wall should win) | 99% | 96% | 95% |
-| 3000/2500 vs 1200/1000 (stomp) | 0% | 0% | 0% | 0% |
+### 6.1 Win rates and durations (Wave 3 TUNING)
+| Matchup (A vs B) | Equal skill (avg/avg) | Weaker = good vs normal AI | Weaker = good vs hard AI | Weaker = expert vs easy AI | Median s (equal skill) |
+|---|---|---|---|---|---|
+| 1200/1200 vs 1200/1200 (mirror) | 50% | 52% | 49% | 59% | 10.3 |
+| 1700/1200 vs 1200/1200 (−500 melee) | 0% | 0% | 0% | 0% | 7.5 |
+| 1800/1000 vs 1300/2000 (−500, high DEF) | 8% | 9% | 8% | 10% | 9.7 |
+| 2500/2100 vs 2000/2100 (−500 ranged) | 4% | **14%** | 4% | 36% | 10.2 |
+| 2500/2000 vs 2000/2000 (−500 bruiser) | 0% | 0% | 0% | 0% | 10.8 |
+| 1500/1200 vs 1300/1100 (−200) | 0% | 0% | 0% | 0% | 8.7 |
+| 3000/2500 vs Defense-Position 1400 DEF | 0% | 0% | 0% | 0% | 7.0 |
+| 1800/1000 vs 0/2000 Defense-Position wall | 100% (the wall should win) | 100% | 100% | 100% | 8.3 |
+| 3000/2500 vs 1200/1000 (stomp) | 0% | 0% | 0% | 0% | 6.9 |
 
-Median duration in seconds, with p10–p90 in brackets, at equal skill:
+**Real deck cards** (every monster against every opposing monster, in both positions, 18,000 fights): median **9.0 s** (p10–p90 6.1–12.6 s), 62% inside 8–15 s, and 0.3% reach sudden death. Upset rate by battle-stat gap:
 
-| Matchup | Median (p10–p90) |
-|---|---|
-| mirror | 9.8 (8.1–11.3) |
-| −500 low | 7.0 (5.0–10.2) |
-| −500 high DEF | 9.3 |
-| −500 ranged | 9.1 |
-| −500 bruisers | 11.0 |
-| −200 | 7.8 |
-| 3000 vs Defense 1400 | 10.3 (7.2–12.9) |
-| wall | 10.3 |
-| stomp | 10.7 (8.1–14.3) |
+| Gap | Before Wave 3 | After Wave 3 |
+|---|---|---|
+| \|gap\| < 200 | 21.3% | 28.0% |
+| 200–499 | 7.0% | 11.6% |
+| 500–999 | 0.6% | 0.8% |
+| ≥ 1000 | 0.0% | 0.0% |
 
-- Sudden death triggers in < 1% of fights, except for an easy AI in a stomp at 8%.
-- Even fights land at **8–12 s**. Lopsided fights end at 6–11 s, which is intended: a stomp should be quick but still show a fight.
-- Novice-vs-normal fights run about 1 s longer.
+Matchups with a gap ≥ 500 and more than 25% upsets: 3 before, 1 after. The one left is Alpha (1400) beating Spear Dragon at 45%, down from 75%, thanks to the HP DEF floor.
 
-### 6.2 Fairness guard
+### 6.2 Fairness guard and skill expression
 | Check | Result |
 |---|---|
-| −500 ATK with good play vs the normal AI | ≤ 25% in every case (3–25%) ✔ |
-| −500 ATK vs the hard AI | ≤ 12% ✔ |
-| Equal stats, equal skill | 49% / 49% with 1–2% draws ✔ |
+| −500 ATK with good play vs the normal AI | worst case 14% (ranged) ✔ ≤ 25% |
+| Equal stats, equal skill | 50/50 ✔ |
 
-Skill still matters:
-- A good player wins an equal-stat fight 77% of the time against the normal AI.
-- A good player wins a −200 fight 30% of the time against the normal AI.
-- An expert player against the easy AI can overturn −500 fights 21–57% of the time. This is intended for the easy difficulty, so new players can learn.
+**Known limitation: melee skill expression is low.**
+- Melee and bruiser trades are close to a fixed damage race in the real sim:
+  - Basic hits land about 95% of the time for every AI profile.
+  - The 0.15 s melee wind-up is shorter than every reaction delay (180–480 ms), so the AI can never see it in time to step back.
+- In Wave 3 I tried constant-only fixes:
+  - A 0.3–0.45 s wind-up, with reach slack 0–2 and `windupMoveMult` 0–1.
+  - Melee dodge rates rose by only 3–8 points, and some swift fights stretched to 15 s.
+  - None of these were adopted.
+- What did help was lowering `statExp` from 1.4 to 1.0:
+  - The −200 deck bucket rose from 7% to 12% upsets.
+  - The ranged −500 case reached 14% for a good player.
+- The ArenaSim and ArenaAI need **logic** changes, not constants, to reach roughly 10–25% upsets at −500 in melee. Recommendations for the Arena developer:
+  1. Lock a melee strike's direction at wind-up, so that a sidestep makes it whiff, the same way the dash already works.
+  2. Let a fighter cancel its own wind-up by moving away (today `windupMoveMult` slows both fighters).
+  3. Make ArenaAI sidestep melee wind-ups rather than back straight off.
+  4. Lengthen the wind-up per style: bruiser about 0.35 s, melee about 0.25 s, swift 0.15 s.
+
+  A real human can already dodge better than the AI proxy does, so measured skill expression is a lower bound.
 
 ### 6.3 Style cross-table
-The table shows the row style's win %, at 1500/1200 and equal skill 0.72.
+The table shows the row style's win %, at 1500/1200 and average vs average, in the real sim.
 
 | | melee | ranged | bruiser | swift |
 |---|---|---|---|---|
-| melee | 50 | 42 | 51 | 57 |
-| ranged | 57 | 50 | 51 | 48 |
-| bruiser | 49 | 48 | 51 | 46 |
-| swift | 42 | 51 | 53 | 50 |
+| melee | 51 | 37 | 36 | 42 |
+| ranged | 57 | 50 | 60 | 40 |
+| bruiser | 62 | 38 | 44 | 63 |
+| swift | 54 | 59 | 37 | 52 |
 
 ### 6.4 Re-tuning checklist
-Use this checklist once the real `ArenaSim` exists:
-1. Replace the model's `ENGAGE`, `ACC_MOD` and `EVADE_MOD` with values measured from the sim.
-2. If fights run long, scale `hpScale` (it changes duration linearly and leaves fairness unchanged).
-3. If upsets rise above 25%, raise `statExp` in steps of 0.1.
-4. To change how much DEF matters, adjust `hpDefWeight` and `resK`.
+1. If fights run long, scale `hpScale` (it changes duration linearly and leaves fairness unchanged).
+2. If −500 upsets rise above 25%, raise `statExp` in steps of 0.1.
+3. To change how much DEF matters, adjust `hpDefWeight` and `resK`. For glass cannons, adjust `hpDefFloorFrac`.
+4. Re-run `npm run sim` and check the GDD targets block at the end.
+
+---
+
+## 7. Pacing results (Wave 3)
+**Method.** `npm run sim` section 4 runs 400 seeded duels per difficulty:
+- Yugi vs Kaiba, with `simulateDuel` (DuelAI on both seats). Seats and the first player alternate.
+- Every attack on a monster is resolved by the real ArenaSim, with the "human" seat at average skill against the NPC at normal.
+- Wall time per match = turns × **20 s** (decisions plus duel animations) + fights × (fight + 3 s for intro, outro and transition).
+
+### 7.1 Match length: before and after
+| Setting | Turns (total) | Fights | Direct attacks | Median min [p10–p90] |
+|---|---|---|---|---|
+| Wave 2 (`npm run sim`, PlaceholderAI, 4000 LP) | 8 | 2 | 2 | 3.0 [1.7–5.5] |
+| Wave 2 (DuelAI normal, 4000 LP, direct ×1) | 9 | 3 | 3 | 3.5 [2.0–7.0] |
+| 6000 LP | 12 | 4 | 4 | 4.7 |
+| 8000 LP | 14 | 4 | 5 | 5.5 |
+| 8000 LP, direct ×0.75 | 16 | 5 | 7 | 6.4 |
+| 8000 LP, direct ×0.5 | 19 | 6 | 9 | 7.6 |
+| **8000 LP, direct ×0.4 + new decks (shipped), DuelAI normal** | **21** | **7** | **10** | **8.4 [5.3–14.1]** |
+| same, DuelAI hard | 21 | 7 | 10 | 8.5 [5.4–13.3] |
+| same, DuelAI easy | 29 | 9 | 9 | 11.7 [7.1–18.6] |
+
+The rows between the Wave 2 baselines and the shipped row are sweeps with the old decks. A smaller opening hand (4) made no difference.
+
+**Fights:** about 7 per match, inside the 5–8 target. They take a median of 8.8 s (real deck cards, 9.0 s), and sudden death happens in 0.3% of fights.
+
+### 7.2 Deck balance (Kaiba win %, equal difficulty)
+| Difficulty | Before | After |
+|---|---|---|
+| normal, stat-arena stand-in (`statArenaResolver`) | 64% | 60%* |
+| normal, real arena | 55% | **49.5%** |
+| hard, real arena | 54% | **46.8%** |
+| easy, real arena | 68–70% | 57.8% |
+
+The deck changes (`src/data/decks.ts`) were:
+
+| Deck | Removed | Added |
+|---|---|---|
+| Yugi | Silver Fang, Mammoth Graveyard (1200/800 vanillas) | Beta The Magnet Warrior, Breaker the Magical Warrior |
+| Kaiba | Raigeki | Dark Hole (the one-sided wipe was the biggest swing card) |
+| Kaiba | Krokodilus (1100/1200) | X-Head Cannon (keeps Kaiba's normal and hard rates in band after the other changes) |
+
+\* `statArenaResolver` is the arena stand-in that tests use. It resolves fights with DuelAI's logistic (`arenaLogisticK` 140), which fits the real sim poorly at large gaps. Use the real-arena rows for balance.
+
+The easy AI makes about 35% random plays, which favours raw-stat beatdown, so Kaiba still wins 58% at easy. The sim checks easy against a looser 40–60% band.
+
+### 7.3 Open items
+- The arena share of LP damage is only about 22%; direct attacks dominate once boards empty. If the arena should matter more, raise `battle.minBattleDamage` or the performance range. Doing so shortens matches, so lower `directAttackMult` to compensate (for example 0.35 with minBattleDamage 300 gives 8.9 min).
+- The p90 match length is 13–14 min. Long games are mostly wall stalemates.
+- Melee skill expression needs ArenaSim and ArenaAI logic changes (Section 6.2).

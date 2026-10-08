@@ -28,7 +28,8 @@ export interface StyleProfile {
 export const TUNING = {
   // ---------------- Duel ----------------
   duel: {
-    startingLp: 4000,
+    /** Wave 3 pacing: 4000 gave 3-4 min matches; 8000 (+ softened direct attacks) gives ~8 min. */
+    startingLp: 8000,
     deckSize: 30,
     openingHand: 5,
     handLimit: 6,
@@ -47,15 +48,19 @@ export const TUNING = {
      * Stats are scaled super-linearly so the damage race depends on the stat RATIO raised to
      * ~2*statExp (both HP and Power grow with ATK). This makes a -500 ATK gap decisive at every level
      * while keeping mirror-match durations roughly level-independent.
-     *   S      = hpAtkWeight*ATK + hpDefWeight*DEF
+     *   S      = hpAtkWeight*ATK + hpDefWeight*max(DEF, hpDefFloorFrac*ATK)
      *   maxHp  = (hpBase + hpScale * (S/1000)^statExp) * style.hpMult
      *   power  = (powerBase + powerScale * (ATK/1000)^statExp) * style.powerMult
      */
-    statExp: 1.4,
+    /** Wave 3: 1.4 -> 1.0. With the real ArenaSim the race is near-deterministic, so 1.4 made any gap absolute. */
+    statExp: 1.0,
     hpBase: 50,
     hpScale: 640,
     hpAtkWeight: 0.7,
     hpDefWeight: 0.3,
+    /** Wave 3: for HP only, DEF counts as at least ATK x this (glass cannons like Spear Dragon 1900/0 were
+     *  losing to -500 monsters). Resistance still uses the real DEF. */
+    hpDefFloorFrac: 0.5,
     powerBase: 2,
     powerScale: 60,
     /** Resistance: dmg * resK / (resK + DEF). DEF 0 -> 100%, DEF 2000 -> 80%, DEF 4000 -> 67%. */
@@ -186,6 +191,8 @@ export const TUNING = {
     upsetDamageFactor: 0.5,
     /** LP damage is rounded to this step. */
     roundTo: 10,
+    /** Direct attacks deal ATK x this (rounded to roundTo). Pacing lever: < 1 lengthens matches. */
+    directAttackMult: 0.4,
   },
 
   // ---------------- Abilities ----------------
@@ -276,7 +283,7 @@ export function arenaStats(card: CardDef, atk: number, def: number, position: Po
   const s = TUNING.styles[style];
   const A = Math.max(0, position === 'defense' && a.defensePosUsesDefAsAtk ? def : atk);
   const D = Math.max(0, def);
-  const S = a.hpAtkWeight * A + a.hpDefWeight * D;
+  const S = a.hpAtkWeight * A + a.hpDefWeight * Math.max(D, A * a.hpDefFloorFrac);
   return {
     maxHp: Math.round((a.hpBase + a.hpScale * Math.pow(S / 1000, a.statExp)) * s.hpMult),
     power: (a.powerBase + a.powerScale * Math.pow(A / 1000, a.statExp)) * s.powerMult,
@@ -378,9 +385,9 @@ export function resolveBattle(
   return { attackerDestroyed: true, defenderDestroyed: false, lpDamage: [dmg, 0] };
 }
 
-/** Direct attack: full ATK to the defending player, no arena, no multiplier. */
+/** Direct attack: ATK x TUNING.battle.directAttackMult to the defending player, no arena. */
 export function directAttackDamage(attackerAtk: number): number {
-  return Math.max(0, attackerAtk);
+  return roundLp(Math.max(0, attackerAtk) * TUNING.battle.directAttackMult);
 }
 
 // ---------------------------------------------------------------------------

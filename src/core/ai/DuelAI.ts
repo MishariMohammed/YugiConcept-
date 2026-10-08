@@ -76,6 +76,8 @@ export const AI_TUNING = {
 const WIN = 1e6;
 const NO_TRAPS = (): boolean => false;
 const EXPECTED_PERF = performanceMultiplier(0.5);
+/** Direct attacks deal ATK x this (TUNING.battle.directAttackMult, Mechanics wave 3). */
+const DIRECT_MULT = TUNING.battle.directAttackMult;
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -190,7 +192,7 @@ class Brain {
     if (s.players[this.opp].monsters.some(Boolean)) return null;
     const ready = s.players[this.me].monsters.filter((m): m is MonsterSlot =>
       !!m && m.position === 'attack' && !m.faceDown && !m.attackedThisTurn);
-    const total = ready.reduce((sum, m) => sum + this.engine.getEffectiveAtk(m.card.uid), 0);
+    const total = ready.reduce((sum, m) => sum + this.engine.getEffectiveAtk(m.card.uid), 0) * DIRECT_MULT;
     if (total < s.players[this.opp].lp) return null;
     if (s.phase === 'main') return this.legal.find((a) => a.type === 'enterBattle') ?? null;
     const direct = this.legal
@@ -569,7 +571,7 @@ export function evaluate(e: DuelEngine, me: PlayerId, diff: AIDifficulty, turnOv
   const virtualAtk = O.hand.length > 0 ? AI_TUNING.virtualAttacker.atk : 0;
   const vw = AI_TUNING.virtualAttacker.weight;
   if (mine.length === 0) {
-    const total = theirs.reduce((sum, t) => sum + t.atk, 0) + vw * virtualAtk;
+    const total = (theirs.reduce((sum, t) => sum + t.atk, 0) + vw * virtualAtk) * DIRECT_MULT;
     score -= 0.6 * Math.min(total, P.lp) + (total >= P.lp ? 4000 : 0);
   } else if (oppBest > 0 || virtualAtk > 0) {
     const penAgainst = (m: SeenMonster, atk: number): number => {
@@ -623,7 +625,7 @@ function opportunity(attackers: SeenMonster[], targets: SeenMonster[], oppLp: nu
     if (arenaWinProbability(best.a.atk - best.t.stat) >= 0.5) T = T.filter((x) => x !== best!.t);
   }
   if (T.length === 0 && A.length) {
-    const direct = A.reduce((s, a) => s + a.atk, 0);
+    const direct = A.reduce((s, a) => s + a.atk, 0) * DIRECT_MULT;
     total += Math.min(direct, oppLp) + (direct >= oppLp ? AI_TUNING.lethalBonus : 0);
   }
   return total;
@@ -646,7 +648,7 @@ class AttackSearch {
     if (A.length === 0) return { value: 0, move: null };
     if (T.length === 0) {
       // All direct: order doesn't matter; strongest first (lethal ASAP).
-      const total = A.reduce((s, a) => s + a.atk, 0);
+      const total = A.reduce((s, a) => s + a.atk, 0) * DIRECT_MULT;
       const first = [...A].sort((x, y) => y.atk - x.atk)[0];
       const r = depth === 0 ? this.risk : this.risk * 0.5;
       const v = Math.min(total, oppLp) + (total >= oppLp ? WIN / 10 : 0);
@@ -720,8 +722,8 @@ function trapDecision(e: DuelEngine, prompt: TrapPrompt, diff: AIDifficulty): bo
     let threat: number;
     let lethal = false;
     if (targetUid === null) {
-      threat = atk;
-      lethal = atk >= myLp;
+      threat = atk * DIRECT_MULT;
+      lethal = threat >= myLp;
     } else {
       const t = seenMonster(e, targetUid, me);
       if (!t) threat = 0;

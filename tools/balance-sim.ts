@@ -9,7 +9,7 @@
 //  1. Model matchups (same rows as tools/arena-model.ts) x skill scenarios -> upset %, durations.
 //  2. Style cross-table at equal stats.
 //  3. Real deck cards: every monster in each deck vs every monster in the opposing deck.
-//  4. Full-match estimate: 200 seeded duels (DuelEngine + PlaceholderAI on both sides), arena
+//  4. Full-match estimate: 400 seeded duels per difficulty (simulateDuel: DuelAI on both seats), arena
 //     fights resolved by ArenaSim; wall time = turns x turn overhead + fights x (intro+fight+outro).
 //  5. GDD target checks (PASS/FAIL).
 
@@ -17,12 +17,12 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { ArenaRequest, ArenaResult, ArenaStyle, CardDef, CardInstance, PlayerId, Position } from '../src/core/types';
-import { TUNING, type Difficulty } from '../src/core/combat/Formulas';
+import { TUNING, resolveBattle } from '../src/core/combat/Formulas';
 import { simulateArena, type ArenaController } from '../src/core/combat/ArenaSim';
-import { ArenaAI, type ArenaSkill, type PlayerSkill } from '../src/core/ai/ArenaAI';
+import { ArenaAI, type ArenaSkill } from '../src/core/ai/ArenaAI';
 import { getCard, registerCards, loadDefaultCards } from '../src/core/cards/CardDB';
-import { DuelEngine } from '../src/core/duel/DuelEngine';
-import { placeholderChooseAction } from '../src/core/ai/PlaceholderAI';
+import { simulateDuel } from '../src/core/ai/HumanAutoplay';
+import type { AIDifficulty } from '../src/core/ai/DuelAI';
 import { DECKS } from '../src/data/decks';
 import { Rng } from '../src/core/rng';
 
@@ -224,63 +224,64 @@ if (!QUICK) {
 }
 
 // ---------------------------------------------------------------------------
-// 4. Full match estimate
+// 4. Full match estimate (DuelAI on both seats via simulateDuel, real ArenaSim fights)
 // ---------------------------------------------------------------------------
 if (!QUICK) {
-  const DUELS = 200;
+  const DUELS = 400;
   const TURN_OVERHEAD_SEC = 20; // human decisions + duel animations per turn (GDD 4 pacing)
   const ARENA_FRAME = TUNING.arena.introSec + TUNING.arena.outroSec + 0.5; // + transition
-  const turnsA: number[] = [], fightsA: number[] = [], minutes: number[] = [], fightSecs: number[] = [];
-  const directA: number[] = [];
-  let lpDirect = 0, lpArena = 0, lpOther = 0;
-  let stuck = 0, draws = 0;
-  for (let i = 0; i < DUELS; i++) {
-    const seed = 9000 + i;
-    const e = new DuelEngine({ deck0: DECKS.yugi, deck1: DECKS.kaiba, seed, firstPlayer: (i % 2) as PlayerId });
-    let fights = 0, fightTime = 0, guard = 0, directs = 0, inArena = false, lastAttackDirect = false;
-    e.on((ev) => {
-      if (ev.type === 'attack') { lastAttackDirect = ev.targetUid === null; if (lastAttackDirect) directs++; }
-      if (ev.type === 'lp' && ev.delta < 0) {
-        if (inArena) lpArena -= ev.delta; else if (lastAttackDirect) lpDirect -= ev.delta; else lpOther -= ev.delta;
-      }
-      if (ev.type === 'phase') lastAttackDirect = false;
-    });
-    while (!e.isOver && guard++ < 5000) {
-      if (e.pendingArena) {
-        const req = e.pendingArena;
-        const human = req.attacker.player === 0 ? 0 : 1;
-        const skills: [Difficulty | PlayerSkill, Difficulty | PlayerSkill] = human === 0 ? ['average', 'normal'] : ['normal', 'average'];
-        const r: ArenaResult = simulateArena(req, [new ArenaAI(skills[0], req.seed + 1), new ArenaAI(skills[1], req.seed + 2)]).result;
-        fights++; fightTime += r.durationSec; fightSecs.push(r.durationSec);
-        inArena = true;
-        e.resolveArena(r);
-        inArena = false;
-        continue;
-      }
-      const p = e.state.activePlayer;
-      const act = placeholderChooseAction(e, p);
-      if (!act) break;
-      try { e.apply(act); } catch { e.apply({ type: 'endTurn' }); }
+  const LP0 = TUNING.duel.startingLp;
+  const diffs: AIDifficulty[] = ['normal', 'easy', 'hard'];
+  for (const diff of diffs) {
+    const turnsA: number[] = [], fightsA: number[] = [], minutes: number[] = [], fightSecs: number[] = [], directA: number[] = [];
+    let lpArena = 0, lpTotal = 0, kaibaWins = 0, decided = 0, timeouts = 0;
+    for (let i = 0; i < DUELS; i++) {
+      // Alternate seats (kaiba as player 0 / 1) and who goes first, so seat and tempo cancel out.
+      const kaibaSeat = (i % 2) as PlayerId;
+      const firstPlayer = ((i >> 1) % 2) as PlayerId;
+      let fightTime = 0;
+      const r = simulateDuel({
+        seed: 9000 + i,
+        deck0: kaibaSeat === 0 ? DECKS.kaiba : DECKS.yugi,
+        deck1: kaibaSeat === 0 ? DECKS.yugi : DECKS.kaiba,
+        difficulties: [diff, diff],
+        firstPlayer,
+        resolveArena: (req: ArenaRequest) => {
+          // Seat 0 plays the "human" (average skill) side of the arena, seat 1 the NPC (normal).
+          const skills: [ArenaSkill, ArenaSkill] = req.attacker.player === 0 ? ['average', 'normal'] : ['normal', 'average'];
+          const res = simulateArena(req, [new ArenaAI(skills[0], req.seed + 1), new ArenaAI(skills[1], req.seed + 2)]).result;
+          fightTime += res.durationSec; fightSecs.push(res.durationSec);
+          const d = req.defender;
+          const o = resolveBattle(req.attacker.atk, { atk: d.atk, def: d.defStat, position: d.position }, res);
+          lpArena += o.lpDamage[0] + o.lpDamage[1];
+          return res;
+        },
+      });
+      if (r.timedOut) { timeouts++; continue; }
+      lpTotal += Math.max(0, LP0 - r.lp[0]) + Math.max(0, LP0 - r.lp[1]);
+      turnsA.push(r.turns); fightsA.push(r.fights); directA.push(r.directAttacks);
+      minutes.push((r.turns * TURN_OVERHEAD_SEC + fightTime + r.fights * ARENA_FRAME) / 60);
+      if (r.winner === 0 || r.winner === 1) { decided++; if (r.winner === kaibaSeat) kaibaWins++; }
     }
-    if (!e.isOver) { stuck++; continue; }
-    if (e.state.winner === 'draw') draws++;
-    const turns = e.state.turn;
-    turnsA.push(turns); fightsA.push(fights); directA.push(directs);
-    minutes.push((turns * TURN_OVERHEAD_SEC + fightTime + fights * ARENA_FRAME) / 60);
+    console.log(`== Full match estimate: ${DUELS} duels yugi vs kaiba, DuelAI ${diff} on both seats (simulateDuel), arena = ArenaSim average vs normal`);
+    console.log(`   LP ${LP0}, direct attacks x${TUNING.battle.directAttackMult}; wall time = turns x ${TURN_OVERHEAD_SEC}s + fights x (fight + ${ARENA_FRAME.toFixed(1)}s intro/outro/transition)`);
+    console.log(`   turns (total, both players): median ${quant(turnsA, 0.5)} [p10 ${quant(turnsA, 0.1)} - p90 ${quant(turnsA, 0.9)}]`);
+    console.log(`   arena fights per match:      median ${quant(fightsA, 0.5)} [p10 ${quant(fightsA, 0.1)} - p90 ${quant(fightsA, 0.9)}]`);
+    console.log(`   direct attacks per match:    median ${quant(directA, 0.5)} [p10 ${quant(directA, 0.1)} - p90 ${quant(directA, 0.9)}]`);
+    console.log(`   LP damage source (approx):   arena ${pct(lpArena / (lpTotal || 1))}, direct + effects ${pct(1 - lpArena / (lpTotal || 1))}`);
+    console.log(`   arena fight duration:        median ${sec(quant(fightSecs, 0.5))}`);
+    console.log(`   match length:                median ${quant(minutes, 0.5).toFixed(1)} min [p10 ${quant(minutes, 0.1).toFixed(1)} - p90 ${quant(minutes, 0.9).toFixed(1)}]  (target 8-12)`);
+    console.log(`   deck balance:                kaiba wins ${pct(kaibaWins / (decided || 1))} of ${decided} decided duels${timeouts ? `, ${timeouts} timeouts` : ''}`);
+    if (diff === 'normal') {
+      const m = quant(minutes, 0.5);
+      check('match length median 8-12 min (normal)', m >= 8 && m <= 12, `${m.toFixed(1)} min`);
+    }
+    const kw = kaibaWins / (decided || 1);
+    // Easy AI makes ~35% random plays, which favours raw-stat beatdown (Kaiba): looser band, see GDD 7.
+    const [lo, hi] = diff === 'easy' ? [0.4, 0.6] : [0.45, 0.55];
+    check(`deck balance ${Math.round(lo * 100)}-${Math.round(hi * 100)}% (${diff})`, kw >= lo && kw <= hi, `kaiba ${pct(kw)}`);
+    console.log('');
   }
-  console.log(`== Full match estimate: ${DUELS} duels yugi vs kaiba (PlaceholderAI both sides, arena = ArenaSim average vs normal)`);
-  console.log(`   wall time = turns x ${TURN_OVERHEAD_SEC}s + fights x (fight + ${ARENA_FRAME.toFixed(1)}s intro/outro/transition)`);
-  console.log(`   turns (total, both players): median ${quant(turnsA, 0.5)} [p10 ${quant(turnsA, 0.1)} - p90 ${quant(turnsA, 0.9)}]`);
-  console.log(`   arena fights per match:      median ${quant(fightsA, 0.5)} [p10 ${quant(fightsA, 0.1)} - p90 ${quant(fightsA, 0.9)}]`);
-  console.log(`   direct attacks per match:    median ${quant(directA, 0.5)} [p10 ${quant(directA, 0.1)} - p90 ${quant(directA, 0.9)}]`);
-  const lpT = lpDirect + lpArena + lpOther || 1;
-  console.log(`   LP damage source:            direct ${pct(lpDirect / lpT)}, arena ${pct(lpArena / lpT)}, effects ${pct(lpOther / lpT)}`);
-  console.log(`   arena fight duration:        median ${sec(quant(fightSecs, 0.5))}`);
-  console.log(`   match length:                median ${quant(minutes, 0.5).toFixed(1)} min [p10 ${quant(minutes, 0.1).toFixed(1)} - p90 ${quant(minutes, 0.9).toFixed(1)}]  (target 8-12)`);
-  if (stuck || draws) console.log(`   (${stuck} duels hit the action guard, ${draws} draws)`);
-  const m = quant(minutes, 0.5);
-  check('match length median 8-12 min', m >= 8 && m <= 12, `${m.toFixed(1)} min`);
-  console.log('');
 }
 
 // ---------------------------------------------------------------------------

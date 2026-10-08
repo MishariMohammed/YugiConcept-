@@ -13,7 +13,7 @@ import {
   type EffectTrigger, type SummonInfo,
 } from '../cards/EffectRegistry';
 import '../cards/effects/index';
-import { resolveBattle as defaultResolveBattle } from '../combat/Formulas';
+import { resolveBattle as defaultResolveBattle, directAttackDamage } from '../combat/Formulas';
 import { Rng } from '../rng';
 import {
   RULES, combinations, countOccupied, findInHand, findMonster, findSpellTrap, freeZone, other,
@@ -508,13 +508,14 @@ export class DuelEngine {
 
     if (targetUid === null) {
       const atk = this.getEffectiveAtk(attackerUid);
+      const dmg = directAttackDamage(atk); // TUNING.battle.directAttackMult (Mechanics)
       if (this.hasFlag(opp, 'noBattleDamage')) this.log('No battle damage is taken.');
-      else this.changeLp(opp, -atk);
+      else this.changeLp(opp, -dmg);
       if (s.winner === null) {
         const info: BattleInfo = {
           attackerUid, attackerPlayer: player, defenderUid: null, defenderPlayer: opp,
           attackerAtk: atk, defenderAtk: 0, defenderDef: 0, defenderPosition: 'attack',
-          outcome: { attackerDestroyed: false, defenderDestroyed: false, lpDamage: [0, atk] },
+          outcome: { attackerDestroyed: false, defenderDestroyed: false, lpDamage: [0, dmg] },
         };
         this.participantHook(attackerUid, (h, ctx) => h.afterBattle?.(ctx, info));
       }
