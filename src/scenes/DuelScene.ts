@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { getCard, getDecks } from '../core/cards/CardDB';
 import { DuelEngine } from '../core/duel/DuelEngine';
 import { describeAction } from '../core/duel/Actions';
-import { placeholderChooseAction } from '../core/ai/PlaceholderAI';
+import { chooseAction, makeTrapPolicy, type AIDifficulty } from '../core/ai/DuelAI';
 import type { CardInstance, DuelAction, MonsterSlot, PlayerId, SpellTrapSlot } from '../core/types';
 import { SCENES, runArena, type DuelSceneData, type ResultSceneData } from './SceneBus';
 import { button, label } from './ui';
@@ -22,16 +22,22 @@ export class DuelScene extends Phaser.Scene {
   private selected: number | null = null;
   private busy = false; // arena running or NPC thinking
   private ended = false;
+  private difficulty: AIDifficulty = 'normal';
 
   constructor() { super(SCENES.Duel); }
 
   create(data: DuelSceneData): void {
     const decks = getDecks();
+    // NPC difficulty: scene data first, then the game registry, default 'normal'.
+    const diff = (data as { difficulty?: string }).difficulty ?? this.registry.get('difficulty');
+    this.difficulty = diff === 'easy' || diff === 'hard' ? diff : 'normal';
     this.engine = new DuelEngine({
       deck0: decks[data.deck0],
       deck1: decks[data.deck1],
       seed: data.seed ?? 1,
       firstPlayer: HUMAN,
+      // The NPC decides when its own Set traps fire; the human's traps always fire (for now).
+      trapPolicy: makeTrapPolicy(() => this.engine, NPC, this.difficulty),
     });
     this.selected = null;
     this.busy = false;
@@ -81,8 +87,8 @@ export class DuelScene extends Phaser.Scene {
       this.busy = true;
       this.time.delayedCall(NPC_STEP_MS, () => {
         this.busy = false;
-        const a = placeholderChooseAction(this.engine, NPC);
-        if (a) this.act(a);
+        if (this.engine.state.activePlayer !== NPC || this.engine.pendingArena) return;
+        this.act(chooseAction(this.engine, NPC, this.difficulty));
       });
     }
   }
