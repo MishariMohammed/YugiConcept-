@@ -6,10 +6,16 @@
 // Design decisions (see docs/GDD.md section 3):
 //  - Sides: 0 = attacker, 1 = defender (NOT PlayerId). Fighter.player maps back to the duel.
 //  - Basic attacks are AUTOMATIC by default: whenever the enemy is in reach and the attack timer
-//    is ready, the fighter swings (melee: short telegraphed wind-up, dodgeable) or fires a bolt
+//    is ready, the fighter swings (melee: see "Locked melee strikes" below) or fires a bolt
 //    (ranged: aimed at the enemy's current position, dodgeable by moving). This keeps mobile
 //    controls simple - the player moves/dodges and taps abilities. `opts.autoAttack` can turn it
 //    off per side, then `input.attack` must be held to swing (still only when in reach).
+//  - Locked melee strikes: at wind-up start (per-style length, TUNING.arena.sim.meleeWindupByStyle)
+//    the strike locks its direction and reach; the hit area is a capsule along that direction whose
+//    origin rides a short forward step-in. Sidestepping out of it makes the strike whiff, and a whiff
+//    roots the attacker for whiffRecoverByStyle (punish window). Backpedalling doesn't escape the
+//    step-in. A firm sideways/away move cancels your OWN basic wind-up (feint) so you can dodge while
+//    trading; the attack timer is refunded to feintRefundCd for the counter-swing.
 //  - Every damage number goes through Formulas.hitDamage (resistance, floor, anti-one-shot cap),
 //    then +-hitVariance, then the target's shield.
 //  - Skill shots (ability/spell projectiles, dashes) aim along input.aimX/aimY when given
@@ -60,6 +66,7 @@ export type SimEvent =
   | { type: 'telegraph'; t: number; id: number; side: Side; x: number; y: number; radius: number; at: number; kind: HitSource; lockOn: boolean }
   | { type: 'burst'; t: number; id: number; side: Side; x: number; y: number; radius: number }
   | { type: 'dash'; t: number; side: Side; dx: number; dy: number }
+  | { type: 'whiff'; t: number; side: Side; x: number; y: number }
   | { type: 'heal'; t: number; side: Side; amount: number }
   | { type: 'status'; t: number; side: Side; status: 'shield' | 'buff' | 'stun'; duration: number; magnitude: number }
   | { type: 'ko'; t: number; side: Side }
@@ -81,7 +88,10 @@ export interface SpellSlot {
 
 /** In-progress action that locks out other attacks (wind-ups, dash, channel). */
 export type FighterAction =
-  | { kind: 'melee'; strikeAt: number; start: number; mult: number; reach: number; stun: number; source: HitSource }
+  /** Locked melee strike: origin (ox, oy), unit direction (dx, dy) and reach are fixed at wind-up start. */
+  | { kind: 'melee'; strikeAt: number; start: number; mult: number; reach: number; halfWidth: number; stun: number; source: HitSource; ox: number; oy: number; dx: number; dy: number }
+  /** Whiff recovery: rooted, cannot attack (punish window). */
+  | { kind: 'recover'; start: number; until: number }
   | { kind: 'dash'; start: number; lungeAt: number; until: number; vx: number; vy: number; mult: number; hit: boolean; source: HitSource }
   | { kind: 'channel'; start: number; until: number };
 
@@ -412,6 +422,22 @@ export class ArenaSim {
       this.cast(f, slot.ability, 'ability', input);
     }
 
+    // Feint: a firm move sideways/away cancels your own BASIC melee wind-up (to dodge the enemy's
+    // swing). Pushing toward the enemy keeps the swing. The swing is lost, but the attack timer is
+    // refunded to feintRefundCd so you can counter-swing into the enemy's whiff recovery.
+    {
+      const a0 = f.action;
+      const S = TUNING.arena.sim;
+      if (a0 && a0.kind === 'melee' && a0.source === 'basic' && t < a0.strikeAt) {
+        const mx = Number.isFinite(input.moveX) ? input.moveX : 0, my = Number.isFinite(input.moveY) ? input.moveY : 0;
+        const m = Math.hypot(mx, my);
+        if (m >= S.feintMinInput && (mx * a0.dx + my * a0.dy) / m < S.feintMaxForwardDot) {
+          f.action = null;
+          f.basicCd = Math.min(f.basicCd, S.feintRefundCd);
+        }
+      }
+    }
+
     // Movement
     const act = f.action;
     if ((!act || act.kind === 'melee') && t >= f.rootUntil) {
@@ -422,6 +448,14 @@ export class ArenaSim {
       let sp = f.stats.speed * f.buffSpeed;
       if (act) sp *= TUNING.arena.sim.windupMoveMult;
       f.vx = mx * sp; f.vy = my * sp;
+      if (act?.kind === 'melee') {
+        // step-in along the locked direction until body contact
+        const ahead = (e.x - f.x) * act.dx + (e.y - f.y) * act.dy;
+        if (ahead > f.radius + e.radius + 2) {
+          const step = TUNING.arena.sim.strikeStepSpeedByStyle[f.stats.style];
+          f.vx += act.dx * step; f.vy += act.dy * step;
+        }
+      }
     }
 
     // Basic attack
@@ -441,10 +475,29 @@ export class ArenaSim {
         }
       } else if (d <= f.stats.range + e.radius) {
         f.basicCd = f.stats.attackInterval * jitter;
-        f.action = { kind: 'melee', start: t, strikeAt: t + S.meleeWindupSec, mult: 1, reach: f.stats.range, stun: 0, source: 'basic' };
+        f.action = this.lockStrike(f, e, S.meleeWindupByStyle[f.stats.style], 1, f.stats.range, 0, 'basic');
+        f.vx = 0; f.vy = 0;
         this.emit({ type: 'attack', t, side: f.side, ranged: false });
       }
     }
+  }
+
+  /** Start a locked melee strike toward the enemy's current position. */
+  private lockStrike(f: Fighter, e: Fighter, windup: number, mult: number, reach: number, stun: number, source: HitSource): FighterAction {
+    let dx = e.x - f.x, dy = e.y - f.y;
+    const l = Math.hypot(dx, dy);
+    if (l < 1e-6) { dx = f.facing; dy = 0; } else { dx /= l; dy /= l; }
+    const halfWidth = TUNING.arena.sim.meleeHalfWidthByStyle[f.stats.style];
+    return { kind: 'melee', start: this.t, strikeAt: this.t + windup, mult, reach, halfWidth, stun, source, ox: f.x, oy: f.y, dx, dy };
+  }
+
+  /** Is fighter `e` inside the locked capsule of strike `a`? Public geometry (renderer/AI/tests use it). */
+  inStrikeArea(a: Extract<FighterAction, { kind: 'melee' }>, e: { x: number; y: number; radius: number }): boolean {
+    const S = TUNING.arena.sim;
+    const rx = e.x - a.ox, ry = e.y - a.oy;
+    const along = rx * a.dx + ry * a.dy;
+    const perp = Math.abs(rx * a.dy - ry * a.dx);
+    return along >= -e.radius && along <= a.reach + e.radius + S.meleeReachSlack && perp <= a.halfWidth + e.radius;
   }
 
   private aimDir(f: Fighter, input: FighterInput): [number, number] {
@@ -496,10 +549,7 @@ export class ArenaSim {
           const [dx, dy] = this.aimDir(f, input);
           this.spawnProjectile(f, dx, dy, S.abilityProjectileSpeed, S.projectileRadius + 1, ab.power, dur, source);
         } else {
-          f.action = {
-            kind: 'melee', start: t, strikeAt: t + S.stunWindupSec, mult: ab.power,
-            reach: f.stats.range + S.stunReachBonus, stun: dur, source,
-          };
+          f.action = this.lockStrike(f, e, S.stunWindupSec, ab.power, f.stats.range + S.stunReachBonus, dur, source);
         }
         break;
       }
@@ -554,13 +604,20 @@ export class ArenaSim {
     if (f.koAt !== null) { f.action = null; return; }
     const e = this.enemy(f);
     if (a.kind === 'melee') {
+      a.ox = f.x; a.oy = f.y; // origin rides the step-in; direction and reach stay locked
       if (t >= a.strikeAt) {
         f.action = null;
-        const d = Math.hypot(e.x - f.x, e.y - f.y);
-        if (e.koAt === null && d <= a.reach + e.radius + TUNING.arena.sim.meleeReachSlack) {
-          this.applyHit(f, e, a.mult, a.source, a.stun, e.x - f.x, e.y - f.y);
+        if (e.koAt === null && this.inStrikeArea(a, e)) {
+          this.applyHit(f, e, a.mult, a.source, a.stun, a.dx, a.dy);
+        } else if (e.koAt === null) {
+          // whiff: punish window
+          f.action = { kind: 'recover', start: t, until: t + TUNING.arena.sim.whiffRecoverByStyle[f.stats.style] };
+          f.vx = 0; f.vy = 0;
+          this.emit({ type: 'whiff', t, side: f.side, x: a.ox + a.dx * a.reach, y: a.oy + a.dy * a.reach });
         }
       }
+    } else if (a.kind === 'recover') {
+      if (t >= a.until) f.action = null;
     } else if (a.kind === 'dash') {
       if (t < a.lungeAt) return;
       if (!a.hit && e.koAt === null) {

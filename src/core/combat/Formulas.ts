@@ -101,11 +101,37 @@ export const TUNING = {
       /** Collision radius; level >= 7 monsters are bigger. */
       bodyRadius: 10,
       bodyRadiusBig: 11,
-      /** Melee basic attack: wind-up before the strike lands (dodgeable), extra reach at strike time. */
-      meleeWindupSec: 0.15,
+      /**
+       * Melee strikes (basic + melee stun). At wind-up start the strike LOCKS its origin, direction
+       * and reach: a capsule from the attacker along the locked direction, length reach + target
+       * radius + meleeReachSlack, half-width meleeHalfWidthByStyle + target radius. A target that sidesteps
+       * or backsteps out of it before the strike lands makes it whiff.
+       */
+      meleeWindupByStyle: { melee: 0.25, bruiser: 0.35, swift: 0.22, ranged: 0.25 },
       meleeReachSlack: 6,
-      /** Movement multiplier while winding up an attack/ability. */
-      windupMoveMult: 0.4,
+      meleeHalfWidthByStyle: { melee: 6, bruiser: 16, swift: 3, ranged: 6 },
+      /** A whiffed strike leaves the attacker rooted and unable to attack for this long (punish window). */
+      whiffRecoverByStyle: { melee: 0.2, bruiser: 0.3, swift: 0.5, ranged: 0.3 },
+      /**
+       * Feint: moving with input >= feintMinInput in a direction whose dot with the strike direction is
+       * < feintMaxForwardDot cancels your own basic melee wind-up; the attack timer drops to feintRefundCd.
+       */
+      feintMinInput: 0.5,
+      feintMaxForwardDot: 0.3,
+      feintRefundCd: 0.2,
+      /** Movement multiplier while winding up a melee strike (0 = planted swing; see strike step-in). */
+      windupMoveMult: 0,
+      /**
+       * Step-in: during the wind-up the attacker slides forward along the LOCKED direction at this
+       * speed (px/s), carrying the strike origin with it. Backpedalling doesn't escape a swing;
+       * sidestepping does. The step stops at body contact.
+       */
+      strikeStepSpeedByStyle: { melee: 80, bruiser: 45, swift: 90, ranged: 60 },
+      /**
+       * ArenaAI reads a melee wind-up after reactionMs * windupReadFrac instead of the full reaction
+       * time: the swing rhythm and the tell are visible, so players anticipate it (scaled by skill).
+       */
+      windupReadFrac: 0.35,
       /** Projectile speeds (px/s): basic ranged attack, ability bolt, arena-spell bolt. */
       basicProjectileSpeed: 320,
       abilityProjectileSpeed: 260,
@@ -174,7 +200,7 @@ export const TUNING = {
   },
 
   styles: {
-    melee:   { speed: 95,  range: 30,  attackInterval: 0.9, hpMult: 1.0,  powerMult: 1.03 },
+    melee:   { speed: 95,  range: 30,  attackInterval: 0.9, hpMult: 1.0,  powerMult: 1.10 },
     ranged:  { speed: 70,  range: 150, attackInterval: 1.2, hpMult: 0.95, powerMult: 1.25 },
     bruiser: { speed: 82,  range: 36,  attackInterval: 1.4, hpMult: 1.15, powerMult: 1.38 },
     swift:   { speed: 130, range: 26,  attackInterval: 0.6, hpMult: 0.95, powerMult: 0.78 },

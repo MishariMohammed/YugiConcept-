@@ -10,6 +10,10 @@
 //  - Abilities: when an ability becomes sensible, roll abilityUseChance; a failed roll makes it
 //    hesitate ~1 s before reconsidering.
 //  - Skill shots are aimed with partial lead (leadFrac) plus a uniform +-aimErrorDeg error.
+//  - Melee wind-ups are read after reactionMs * windupReadFrac (jittered x0.5..1.5): the tell and
+//    swing rhythm let players anticipate. If the exit from the locked strike capsule fits the time
+//    left (sidestep or, if quicker, backstep vs the step-in), roll dodgeChance and sidestep; a dodge
+//    during my own basic wind-up feints it (ArenaSim). A whiffing foe gets punished: walk straight in.
 // Behaviour: melee/bruiser/swift close in and trade; ranged keeps ~80% of its range and kites
 // away from melee threats (sliding along walls); both strafe a little to dodge bolts.
 
@@ -54,6 +58,7 @@ export class ArenaAI implements ArenaController {
   private readonly rng: Rng;
   private history: Seen[] = [];
   private decided = new Map<number, boolean>(); // threat id -> will dodge?
+  private readDelay = new Map<number, number>(); // melee swing id -> seconds until I read it
   private dodge: { dx: number; dy: number; until: number } | null = null;
   private hesitateAbility: number[] = [0, 0];
   private hesitateSpell: number[] = [];
@@ -153,6 +158,8 @@ export class ArenaAI implements ArenaController {
     }
     // melee-ish: close to contact, with a slight arc so it doesn't walk straight into bolts
     const reach = me.stats.range * 0.7 + foe.radius;
+    // punish a whiffed swing: go straight in while the foe is recovering
+    if (foe.action?.kind === 'recover') return [ux, uy];
     if (dist > reach + 40) return [ux + px * 0.25, uy + py * 0.25];
     if (dist > reach) return [ux, uy];
     return [px * 0.15, py * 0.15];
@@ -186,8 +193,9 @@ export class ArenaAI implements ArenaController {
 
   private considerThreats(sim: ArenaSim, me: Fighter, foe: Fighter, seenT: number, t: number): void {
     if (this.dodge && t < this.dodge.until) return;
-    // projectiles heading for me
-    for (const p of sim.projectiles) {
+    // projectiles heading for me (not while I'm committed to my own swing: a sidestep would feint it)
+    const swinging = me.action?.kind === 'melee';
+    for (const p of swinging ? [] : sim.projectiles) {
       if (p.owner === me.side || p.spawnT > seenT) continue;
       const rx = me.x - p.x, ry = me.y - p.y;
       const sp2 = p.vx * p.vx + p.vy * p.vy;
@@ -231,12 +239,41 @@ export class ArenaAI implements ArenaController {
       this.dodge = { dx: nx, dy: ny, until: a.until + 0.05 };
       return;
     }
-    // melee wind-up in reach (step back)
-    if (a && a.kind === 'melee' && a.start <= seenT && t < a.strikeAt) {
+    // Locked melee strike aimed at me: the tell + swing rhythm is read faster than a raw reaction
+    // (reactionMs * windupReadFrac). Sidestep out of the locked capsule (backstep if walled in).
+    if (a && a.kind === 'melee' && t < a.strikeAt && sim.inStrikeArea(a, me)) {
       const id = -Math.round(a.start * 1000) - 1 - foe.side * 1e7;
+      // per-swing read delay: reactionMs * windupReadFrac, jittered x0.5..1.5 (human variance)
+      let read = this.readDelay.get(id);
+      if (read === undefined) {
+        read = (this.profile.reactionMs / 1000) * TUNING.arena.sim.windupReadFrac * (0.5 + this.rng.next());
+        this.readDelay.set(id, read);
+        if (this.readDelay.size > 16) this.readDelay.delete(this.readDelay.keys().next().value as number);
+      }
+      if (t - a.start < read) return;
+      // Pick the quicker exit from the capsule: sideways (toward the side I already lean to) or back.
+      const S = TUNING.arena.sim;
+      const rx = me.x - a.ox, ry = me.y - a.oy;
+      const along = rx * a.dx + ry * a.dy;
+      const perp = rx * a.dy * -1 + ry * a.dx; // signed, positive on the (-dy, dx) side
+      const needSide = a.halfWidth + me.radius - Math.abs(perp);
+      // backing off also has to outrun the attacker's step-in
+      const stepLeft = S.strikeStepSpeedByStyle[foe.stats.style] * Math.max(0, a.strikeAt - t);
+      const needBack = a.reach + me.radius + S.meleeReachSlack - along + stepLeft;
+      // Only try when the exit fits in the time left (a failed dodge also cancels my own swing).
+      const mySpeed = me.stats.speed * me.buffSpeed;
+      const left = a.strikeAt - t - SIM_DT;
+      if (Math.min(needSide, needBack) / mySpeed > left) return;
       if (!this.roll(id)) return;
-      const l = Math.hypot(me.x - foe.x, me.y - foe.y) || 1;
-      this.dodge = { dx: (me.x - foe.x) / l, dy: (me.y - foe.y) / l, until: a.strikeAt + 0.05 };
+      let nx = -a.dy, ny = a.dx;
+      if (perp < 0 || (perp === 0 && this.rng.next() < 0.5)) { nx = -nx; ny = -ny; }
+      const B = sim.bounds, m = me.radius + 4, look = 22;
+      const blocked = (x: number, y: number) => x < B.x0 + m || x > B.x1 - m || y < B.y0 + m || y > B.y1 - m;
+      if (blocked(me.x + nx * look, me.y + ny * look)) { nx = -nx; ny = -ny; }
+      if (needBack < needSide || blocked(me.x + nx * look, me.y + ny * look)) {
+        if (!blocked(me.x + a.dx * look, me.y + a.dy * look)) { nx = a.dx; ny = a.dy; } // backstep
+      }
+      this.dodge = { dx: nx, dy: ny, until: a.strikeAt + 0.03 };
     }
   }
 

@@ -341,26 +341,54 @@ Matchups with a gap ≥ 500 and more than 25% upsets: 3 before, 1 after. The one
 | Check | Result |
 |---|---|
 | −500 ATK with good play vs the normal AI | worst case 14% (ranged) ✔ ≤ 25% |
-| Equal stats, equal skill | 50/50 ✔ |
+| Equal stats, equal skill | 47/53 ✔ |
 
-**Known limitation: melee skill expression is low.**
-- Melee and bruiser trades are close to a fixed damage race in the real sim:
-  - Basic hits land about 95% of the time for every AI profile.
-  - The 0.15 s melee wind-up is shorter than every reaction delay (180–480 ms), so the AI can never see it in time to step back.
-- In Wave 3 I tried constant-only fixes:
-  - A 0.3–0.45 s wind-up, with reach slack 0–2 and `windupMoveMult` 0–1.
-  - Melee dodge rates rose by only 3–8 points, and some swift fights stretched to 15 s.
-  - None of these were adopted.
-- What did help was lowering `statExp` from 1.4 to 1.0:
-  - The −200 deck bucket rose from 7% to 12% upsets.
-  - The ranged −500 case reached 14% for a good player.
-- The ArenaSim and ArenaAI need **logic** changes, not constants, to reach roughly 10–25% upsets at −500 in melee. Recommendations for the Arena developer:
-  1. Lock a melee strike's direction at wind-up, so that a sidestep makes it whiff, the same way the dash already works.
-  2. Let a fighter cancel its own wind-up by moving away (today `windupMoveMult` slows both fighters).
-  3. Make ArenaAI sidestep melee wind-ups rather than back straight off.
-  4. Lengthen the wind-up per style: bruiser about 0.35 s, melee about 0.25 s, swift 0.15 s.
+**Melee skill expression (Wave 3 follow-up, Arena developer).** Melee trades used to be a fixed damage race: basic hits landed about 95% of the time, because the 0.15 s wind-up was shorter than every reaction delay. The ArenaSim and ArenaAI now implement **locked melee strikes**; all constants live in `TUNING.arena.sim`.
 
-  A real human can already dodge better than the AI proxy does, so measured skill expression is a lower bound.
+1. **Locked strike.** At wind-up start, a basic (or melee-stun) strike locks its **direction and reach**. The hit area is a capsule along that direction, with length = reach + target radius + `meleeReachSlack` and half-width = `meleeHalfWidthByStyle` + target radius.
+   - The capsule's origin rides a short forward **step-in** (`strikeStepSpeedByStyle`), so backpedalling does not escape a swing. Sidestepping does.
+   - The strike resolves against the locked capsule, so a target that moved out of it makes the strike **whiff**.
+2. **Per-style wind-up** (`meleeWindupByStyle`) and strike width:
+
+   | Style | Wind-up | Half-width | Feel |
+   |---|---|---|---|
+   | bruiser | 0.35 s | 16 | Wide, slow sweep; mostly countered by backstepping |
+   | melee | 0.25 s | 6 | Narrow thrust; sidestep it |
+   | swift | 0.22 s | 3 | Quick jab |
+
+   - Swift is 0.22 s rather than 0.15 s. At 0.15 s no reaction model can dodge it, while swift itself dodges everything at 130 px/s; that pushed swift to an 80–95% win rate against melee and bruiser.
+3. **Tell.** The ArenaScene draws the locked capsule on the ground: red for an enemy swing, blue for yours. It fills up until impact, with a flash and a "!" over the attacker.
+4. **Whiff recovery.** A missed strike roots the attacker and blocks attacks for `whiffRecoverByStyle` (melee 0.2 s, bruiser 0.3 s, swift 0.5 s). The sprite wobbles, "MISS" pops up, and the AI walks straight in to punish.
+5. **Feint.** A firm sideways or away move (`feintMinInput`, `feintMaxForwardDot`) cancels your **own** basic wind-up, so you can dodge while trading blows. The attack timer is refunded to `feintRefundCd`, which leaves time to counter-swing into the enemy's recovery.
+6. **ArenaAI** reads a melee wind-up after `reactionMs × windupReadFrac` (0.35), jittered ×0.5–1.5. This models how players anticipate a visible tell and swing rhythm, and it scales with each profile's reaction time.
+   - The AI dodges only if the quicker exit (a sidestep, or a backstep that outruns the step-in) fits in the time left. It then rolls `dodgeChance`.
+   - It does not dodge bolts while committed to its own swing.
+
+**Before → after** (`npm run sim`, 400 fights per cell, upset = the weaker side wins):
+
+| Row | Before | After |
+|---|---|---|
+| Mirror 1200, good vs normal AI (good wins) | 51.5% | **60.3%** |
+| Mirror 1200, good vs hard AI | 48.8% | 30.0% |
+| Mirror 1200, expert vs easy AI | 58.8% | **86.3%** |
+| −500 melee 1700 vs 1200, good vs normal | 0.0% | 0.0% |
+| −500 melee, high DEF (1800/1000 vs 1300/2000), good vs normal | 9.3% | **13.3%** |
+| −500 melee, high DEF, expert vs easy | 9.8% | 49.0% (easy is meant to be beatable) |
+| −500 bruiser 2500 vs 2000, good vs normal | 0.0% | 0.0% |
+| −200 (swift 1500 vs melee 1300), good vs normal | 0.0% | **10.8%** |
+| −200, expert vs easy | 0.0% | 65.8% |
+| Deck upsets, \|gap\| 200–499 | 11.6% | 12.5% |
+| Deck upsets, \|gap\| 500–999 | 0.8% | 1.0% |
+| Deck fight median | 9.0 s | 9.4 s (67% within 8–15 s) |
+| Match length (DuelAI normal) | 8.4 min | 8.6 min |
+
+**Limits.**
+- **The two "−500 melee" rows can't both land in the 10–25% band.**
+  - 1700/1200 vs 1200/1200 is about a 1.75× damage-race gap, because HP and Power both grow with ATK.
+  - 1800/1000 vs 1300/2000 is only about 1.2×, because DEF evens out HP and resistance.
+  - Any skill strength that lifts the first row to 10% upsets pushes the high-DEF row to 35–45%, which breaks the 25% guard. The shipped tuning puts the high-DEF row at 13% and leaves the large-gap row at about 0%: skill now swings close melee fights, and stats still win clear ones.
+- **Style balance.** The style cross-table is now 24–73%. Melee was already the weakest style before this change (36–42%). Recommendation for the Mechanics Specialist: `styles.melee.powerMult` 1.03 → **1.10**. In the sim this gives a melee row of 42–53% vs every style, with the high-DEF −500 row at 10% and fight medians of about 10 s.
+- **Real humans.** They see the drawn tell directly, so the measured melee skill expression is still a lower bound.
 
 ### 6.3 Style cross-table
 The table shows the row style's win %, at 1500/1200 and average vs average, in the real sim.

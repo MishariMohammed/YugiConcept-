@@ -241,3 +241,117 @@ describe('ArenaAI', () => {
     expect(hardWins / n).toBeGreaterThan(0.5);
   });
 });
+
+describe('Locked melee strikes (wind-up, sidestep, whiff, feint)', () => {
+  type MeleeAction = Extract<NonNullable<ArenaSim['fighters'][0]['action']>, { kind: 'melee' }>;
+  /** Attacker (side 0) swings automatically; defender (side 1) never attacks and is driven by `move`. */
+  function duel(style: 'melee' | 'bruiser' | 'swift', move: (sim: ArenaSim) => FighterInput) {
+    const req = request(mon('a', 1500, 1200, { arenaStyle: style }), mon('b', 1500, 1200, { arenaStyle: 'melee' }), 6);
+    const sim = new ArenaSim(req, { spawnGap: 30, autoAttack: [true, false] });
+    const ctl: [ArenaController, ArenaController] = [IDLE_CONTROLLER, { input: (s) => move(s) }];
+    return { sim, ctl };
+  }
+  /** Step until the first strike resolves; returns its events and the locked action. */
+  function firstStrike(sim: ArenaSim, ctl: [ArenaController, ArenaController]) {
+    let locked: MeleeAction | null = null;
+    const ev: SimEvent[] = [];
+    for (let i = 0; i < 300; i++) {
+      ev.push(...sim.step([ctl[0].input(sim, 0), ctl[1].input(sim, 1)]));
+      const a = sim.fighters[0].action;
+      if (a?.kind === 'melee') locked ??= { ...a };
+      if (locked && ev.some((e) => (e.type === 'hit' && e.source === 0) || e.type === 'whiff')) break;
+    }
+    return { ev, locked: locked! };
+  }
+  const sidestep = (s: ArenaSim): FighterInput =>
+    s.fighters[0].action?.kind === 'melee' ? { ...IDLE_INPUT, moveY: 1 } : IDLE_INPUT;
+
+  it('standing still inside the locked area gets hit', () => {
+    const { sim, ctl } = duel('bruiser', () => IDLE_INPUT);
+    const { ev } = firstStrike(sim, ctl);
+    expect(ev.some((e) => e.type === 'hit' && e.source === 0 && e.kind === 'basic')).toBe(true);
+    expect(ev.some((e) => e.type === 'whiff')).toBe(false);
+  });
+
+  it('a sidestep during the wind-up makes the strike whiff, then the attacker is stuck in recovery', () => {
+    const { sim, ctl } = duel('bruiser', sidestep);
+    const { ev, locked } = firstStrike(sim, ctl);
+    expect(ev.some((e) => e.type === 'hit' && e.source === 0)).toBe(false);
+    const whiff = ev.find((e) => e.type === 'whiff');
+    expect(whiff).toBeDefined();
+    expect(sim.fighters[1].hp).toBe(sim.fighters[1].maxHp);
+    // punish window: rooted, no new swing until the recovery ends
+    const rec = sim.fighters[0].action;
+    expect(rec?.kind).toBe('recover');
+    const until = (rec as { until: number }).until;
+    expect(until - whiff!.t).toBeCloseTo(TUNING.arena.sim.whiffRecoverByStyle.bruiser, 5);
+    const x0 = sim.fighters[0].x;
+    while (sim.t < until - 1e-9) {
+      const evs = sim.step([IDLE_INPUT, IDLE_INPUT]);
+      expect(evs.some((e) => e.type === 'attack' && e.side === 0)).toBe(false);
+    }
+    expect(sim.fighters[0].x).toBeCloseTo(x0, 5);
+    // the locked direction never turned to follow the dodge
+    expect(Math.hypot(locked.dx, locked.dy)).toBeCloseTo(1, 6);
+  });
+
+  it('the direction is locked at wind-up start even if the target moves', () => {
+    const { sim, ctl } = duel('bruiser', sidestep);
+    let first: MeleeAction | null = null;
+    for (let i = 0; i < 300 && !sim.done; i++) {
+      sim.step([ctl[0].input(sim, 0), ctl[1].input(sim, 1)]);
+      const a = sim.fighters[0].action;
+      if (a?.kind === 'melee') {
+        first ??= { ...a };
+        expect(a.dx).toBe(first.dx);
+        expect(a.dy).toBe(first.dy);
+        expect(a.reach).toBe(first.reach);
+      } else if (first) break;
+    }
+    expect(first).not.toBeNull();
+  });
+
+  it('backpedalling straight away does not escape the step-in (melee)', () => {
+    const { sim, ctl } = duel('melee', (s) => (s.fighters[0].action?.kind === 'melee' ? { ...IDLE_INPUT, moveX: 1 } : IDLE_INPUT));
+    const { ev } = firstStrike(sim, ctl);
+    expect(ev.some((e) => e.type === 'hit' && e.source === 0)).toBe(true);
+  });
+
+  it('wind-up length depends on the style (bruiser > melee > swift)', () => {
+    const w = TUNING.arena.sim.meleeWindupByStyle;
+    expect(w.bruiser).toBeGreaterThan(w.melee);
+    expect(w.melee).toBeGreaterThan(w.swift);
+    for (const style of ['melee', 'bruiser', 'swift'] as const) {
+      const { sim, ctl } = duel(style, () => IDLE_INPUT);
+      const { locked } = firstStrike(sim, ctl);
+      expect(locked.strikeAt - locked.start).toBeCloseTo(w[style], 5);
+    }
+  });
+
+  it('a firm sideways move feints your own basic wind-up and refunds the attack timer', () => {
+    const req = request(mon('a', 1500, 1200), mon('b', 1500, 1200), 3);
+    const sim = new ArenaSim(req, { spawnGap: 30, autoAttack: [true, false] });
+    while (sim.fighters[0].action?.kind !== 'melee') sim.step([IDLE_INPUT, IDLE_INPUT]);
+    sim.step([{ ...IDLE_INPUT, moveY: 1 }, IDLE_INPUT]);
+    expect(sim.fighters[0].action).toBeNull();
+    expect(sim.fighters[0].basicCd).toBeLessThanOrEqual(TUNING.arena.sim.feintRefundCd + 1e-9);
+    // pushing toward the enemy keeps the swing
+    const sim2 = new ArenaSim(req, { spawnGap: 30, autoAttack: [true, false] });
+    while (sim2.fighters[0].action?.kind !== 'melee') sim2.step([IDLE_INPUT, IDLE_INPUT]);
+    sim2.step([{ ...IDLE_INPUT, moveX: 1 }, IDLE_INPUT]);
+    expect(sim2.fighters[0].action?.kind).toBe('melee');
+  });
+
+  it('ArenaAI sidesteps melee wind-ups (a hard AI makes a normal AI whiff sometimes)', () => {
+    let whiffs = 0, swings = 0;
+    for (let i = 0; i < 10; i++) {
+      const req = request(mon('a', 1500, 1200, { arenaStyle: 'bruiser' }), mon('b', 1500, 1200, { arenaStyle: 'melee' }), 70 + i);
+      const sim = new ArenaSim(req);
+      const ev = runCollect(sim, [new ArenaAI('normal', i), new ArenaAI('hard', i + 9)]);
+      swings += ev.filter((e) => e.type === 'attack' && e.side === 0).length;
+      whiffs += ev.filter((e) => e.type === 'whiff' && e.side === 0).length;
+    }
+    expect(swings).toBeGreaterThan(20);
+    expect(whiffs / swings).toBeGreaterThan(0.05);
+  });
+});

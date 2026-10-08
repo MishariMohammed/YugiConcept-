@@ -9,7 +9,7 @@
 //
 // Controls
 //   Keyboard: WASD / arrows move, J K L or 1 2 3 = abilities, Q / E = arena spells,
-//             Space/Enter skips intro/outro.
+//             Space/Enter skips intro/outro, Esc/P pauses.
 //   Touch:    floating virtual joystick on the left half, ability/spell buttons bottom-right.
 //   Basic attacks are automatic when in reach (see ArenaSim header).
 //   AUTO toggles ArenaAI ('good' player profile) for your monster; SKIP resolves the rest of the
@@ -38,6 +38,9 @@ import { pixelText, setPixelText } from '../ui/PixelText';
 import { fitText, measureText } from '../fx/art/PixelFont';
 import { ensureCardTextures } from '../fx/art/CardArt';
 import { TouchControls, type TouchButton } from '../ui/TouchControls';
+import { PixelButton, dimmer, panelTexture } from '../ui/Widgets';
+import { sfx } from '../fx/Sfx';
+import { PAUSE_EVENT } from '../mobile';
 
 type Phase = 'intro' | 'fight' | 'outro' | 'done';
 
@@ -99,6 +102,8 @@ export class ArenaScene extends Phaser.Scene {
   private ground!: Phaser.GameObjects.Graphics;
   private walls!: Phaser.GameObjects.Graphics;
   private hud!: Phaser.GameObjects.Graphics;
+  private hudRT!: Phaser.GameObjects.RenderTexture;
+  private uiRT!: Phaser.GameObjects.RenderTexture;
   private ui!: Phaser.GameObjects.Graphics;
   private timerText!: Phaser.GameObjects.BitmapText;
   private autoText!: Phaser.GameObjects.BitmapText;
@@ -106,6 +111,9 @@ export class ArenaScene extends Phaser.Scene {
   private abilityButtons: AbilityButton[] = [];
   private autoBtn!: TouchButton;
   private skipBtn!: TouchButton;
+  private pauseBtn!: TouchButton;
+  private paused = false;
+  private pauseObjs: Phaser.GameObjects.GameObject[] = [];
   private queued: { ability: number | null; spell: number | null; at: number } = { ability: null, spell: null, at: 0 };
   private keys!: Record<string, Phaser.Input.Keyboard.Key>;
   private introObjs: Phaser.GameObjects.GameObject[] = [];
@@ -130,6 +138,10 @@ export class ArenaScene extends Phaser.Scene {
     this.outroObjs = [];
     this.result = null;
     this.queued = { ability: null, spell: null, at: 0 };
+    this.paused = false;
+    this.pauseObjs = [];
+    this.hudSig = '';
+    this.btnSig = '';
   }
 
   create(data: ArenaSceneData & { difficulty?: Difficulty; auto?: boolean }): void {
@@ -150,13 +162,21 @@ export class ArenaScene extends Phaser.Scene {
     this.ground = this.add.graphics().setDepth(40);
     this.walls = this.add.graphics().setDepth(400);
     this.views = [this.buildFighter(0), this.buildFighter(1)];
-    this.hud = this.add.graphics().setDepth(3000);
-    this.ui = this.add.graphics().setDepth(4000);
+    // HUD + buttons are drawn off-screen and baked into render textures (see drawHud).
+    this.hud = this.make.graphics({}, false);
+    this.ui = this.make.graphics({}, false);
+    this.hudRT = this.add.renderTexture(0, 0, W, H).setOrigin(0).setDepth(3000);
+    this.uiRT = this.add.renderTexture(0, 0, W, H).setOrigin(0).setDepth(4000);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => { this.hud.destroy(); this.ui.destroy(); });
     this.buildHud();
     this.buildControls();
     this.buildIntro();
     this.syncFighters(0);
     this.drawHud();
+    // App backgrounded / tab hidden / Android back button -> freeze the fight.
+    const onPause = () => { if (this.phase === 'intro' || this.phase === 'fight') this.setPaused(true); };
+    this.game.events.on(PAUSE_EVENT, onPause);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.game.events.off(PAUSE_EVENT, onPause));
   }
 
   // ---------------------------------------------------------------------------
@@ -235,6 +255,8 @@ export class ArenaScene extends Phaser.Scene {
     this.skipBtn = this.touch.addButton({ x: W / 2 + 20, y: 34, width: 34, height: 11, onPress: () => this.skipFight() });
     this.autoText = pixelText(this, W / 2 - 20, 34, 'AUTO', 1, PALT.cream, { tiny: true, originX: 0.5, originY: 0.5 }).setDepth(4002);
     pixelText(this, W / 2 + 20, 34, 'SKIP', 1, PALT.cream, { tiny: true, originX: 0.5, originY: 0.5 }).setDepth(4002);
+    this.pauseBtn = this.touch.addButton({ x: W / 2 - 52, y: 34, width: 18, height: 11, slop: 5, onPress: () => this.setPaused(true) });
+    pixelText(this, W / 2 - 52, 34, '||', 1, PALT.cream, { tiny: true, originX: 0.5, originY: 0.5 }).setDepth(4002);
 
     const kb = this.input.keyboard;
     if (kb) {
@@ -242,7 +264,7 @@ export class ArenaScene extends Phaser.Scene {
       this.keys = kb.addKeys({
         W: K.W, A: K.A, S: K.S, D: K.D, UP: K.UP, LEFT: K.LEFT, DOWN: K.DOWN, RIGHT: K.RIGHT,
         J: K.J, K: K.K, L: K.L, ONE: K.ONE, TWO: K.TWO, THREE: K.THREE, Q: K.Q, E: K.E,
-        SPACE: K.SPACE, ENTER: K.ENTER,
+        SPACE: K.SPACE, ENTER: K.ENTER, ESC: K.ESC, P: K.P,
       }, false) as Record<string, Phaser.Input.Keyboard.Key>;
       const on = (k: string, fn: () => void) => this.keys[k].on('down', fn);
       on('J', () => this.pressAbility(0)); on('ONE', () => this.pressAbility(0));
@@ -250,13 +272,16 @@ export class ArenaScene extends Phaser.Scene {
       on('L', () => this.pressAbility(2)); on('THREE', () => this.pressAbility(2));
       on('Q', () => this.pressSpell(0)); on('E', () => this.pressSpell(1));
       on('SPACE', () => this.skipBanner()); on('ENTER', () => this.skipBanner());
+      on('ESC', () => this.setPaused(!this.paused)); on('P', () => this.setPaused(!this.paused));
     } else {
       this.keys = {};
     }
     this.input.on(Phaser.Input.Events.POINTER_DOWN, () => this.skipBanner());
 
     // one-time hint
-    const hint = pixelText(this, W / 2, H - 9, 'WASD/STICK MOVE  J K ABILITY  Q E SPELL  - ATTACKS ARE AUTO', 1, PALT.cream, { tiny: true, originX: 0.5, originY: 0.5 }).setDepth(3002).setAlpha(0);
+    const touchUI = this.sys.game.device.input.touch && window.matchMedia?.('(pointer: coarse)').matches;
+    const hintText = touchUI ? 'DRAG LEFT SIDE TO MOVE  TAP BUTTONS FOR ABILITIES  - ATTACKS ARE AUTO' : 'WASD/STICK MOVE  J K ABILITY  Q E SPELL  - ATTACKS ARE AUTO';
+    const hint = pixelText(this, W / 2, H - 9, hintText, 1, PALT.cream, { tiny: true, originX: 0.5, originY: 0.5 }).setDepth(3002).setAlpha(0);
     this.tweens.add({ targets: hint, alpha: 0.9, delay: 1500, duration: 200, hold: 2800, yoyo: true, onComplete: () => hint.destroy() });
   }
 
@@ -312,6 +337,39 @@ export class ArenaScene extends Phaser.Scene {
     this.queued.spell = i; this.queued.at = this.sim.t;
   }
 
+  /** Freeze sim, tweens, timers and sprite anims behind a small pause panel. */
+  private setPaused(on: boolean): void {
+    if (on === this.paused) return;
+    if (on && this.phase !== 'intro' && this.phase !== 'fight') return;
+    this.paused = on;
+    if (on) {
+      this.touch.setInputEnabled(false);
+      this.queued = { ability: null, spell: null, at: 0 };
+      this.tweens.pauseAll();
+      this.time.paused = true;
+      this.anims.pauseAll();
+      const objs: Phaser.GameObjects.GameObject[] = [];
+      objs.push(dimmer(this, 0.7, 7000));
+      objs.push(this.add.image(W / 2, H / 2, panelTexture(this, 140, 104)).setDepth(7001));
+      objs.push(pixelText(this, W / 2, H / 2 - 38, 'PAUSED', 2, PALT.gold, { originX: 0.5 }).setDepth(7002));
+      objs.push(new PixelButton(this, W / 2, H / 2 - 2, 110, 24, 'RESUME', PALT.blue, () => this.setPaused(false)).setDepth(7003));
+      const snd: PixelButton = new PixelButton(this, W / 2, H / 2 + 28, 110, 24, sfx.muted ? 'SOUND: OFF' : 'SOUND: ON', PALT.green, () => {
+        sfx.unlock();
+        snd.setText(sfx.toggleMute() ? 'SOUND: OFF' : 'SOUND: ON');
+      }).setDepth(7003);
+      objs.push(snd);
+      this.pauseObjs = objs;
+    } else {
+      this.pauseObjs.forEach((o) => o.destroy());
+      this.pauseObjs = [];
+      this.tweens.resumeAll();
+      this.time.paused = false;
+      this.anims.resumeAll();
+      // re-enable on the next tick so the RESUME tap doesn't also plant the joystick
+      setTimeout(() => { if (!this.paused && this.touch) this.touch.setInputEnabled(true); }, 0);
+    }
+  }
+
   private toggleAuto(): void {
     if (this.phase === 'outro' || this.phase === 'done') return;
     this.auto = !this.auto;
@@ -319,6 +377,7 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private skipBanner(): void {
+    if (this.paused) return;
     if (this.phase === 'intro' && this.phaseT > 120) this.endIntro();
     else if (this.phase === 'outro' && this.phaseT > 200) this.finish();
   }
@@ -349,6 +408,7 @@ export class ArenaScene extends Phaser.Scene {
   // ---------------------------------------------------------------------------
 
   update(_time: number, delta: number): void {
+    if (this.paused) return;
     const dms = Math.min(100, delta);
     this.realNow += dms;
     this.phaseT += dms;
@@ -435,6 +495,21 @@ export class ArenaScene extends Phaser.Scene {
         v.sprite.play(v.info.anims.attack, true);
         v.anim = v.info.anims.attack;
         v.attackUntil = this.realNow + 260;
+        if (this.sim.fighters[e.side].stats.style === 'ranged') sfx.play('attack');
+        else {
+          // melee wind-up tell: warm flash + "!" over the attacker (the locked strike area is drawn on the ground)
+          flashWhite(v.sprite, 70, e.side === this.human ? 0xcfe8ff : 0xffd27a);
+          const f = this.sim.fighters[e.side];
+          const bang = pixelText(this, this.sx(f.x), this.sy(f.y) - v.info.size - 2, '!', 1, e.side === this.human ? 0xbfe0ff : 0xffb347, { originX: 0.5, originY: 1 }).setDepth(2550);
+          this.tweens.add({ targets: bang, y: bang.y - 4, alpha: 0, duration: 260, onComplete: () => bang.destroy() });
+        }
+        break;
+      }
+      case 'whiff': {
+        const x = this.sx(e.x), y = this.sy(e.y);
+        burst(this, x, y, { count: 6, texture: 'px-dust', colors: [PALT.cream, 0xb07a48], speed: 40, depth: 2300 });
+        const miss = pixelText(this, x, y - 14, 'MISS', 1, e.side === this.human ? 0xff9a8a : PALT.cream, { tiny: true, originX: 0.5, originY: 1 }).setDepth(2600);
+        this.tweens.add({ targets: miss, y: miss.y - 8, alpha: 0, delay: 250, duration: 300, onComplete: () => miss.destroy() });
         break;
       }
       case 'abilityCast': {
@@ -448,6 +523,7 @@ export class ArenaScene extends Phaser.Scene {
         const color = e.isSpell ? 0xffb347 : e.side === this.human ? 0xbfe0ff : 0xffc0b8;
         const label = pixelText(this, this.sx(f.x), this.sy(f.y) - v.info.size - 12, e.ability.name, 1, color, { tiny: true, originX: 0.5, originY: 1 }).setDepth(2500);
         this.tweens.add({ targets: label, y: label.y - 10, alpha: 0, delay: 450, duration: 400, onComplete: () => label.destroy() });
+        sfx.play(e.isSpell || e.ability.kind === 'buff' || e.ability.kind === 'shield' ? 'spell' : e.ability.kind === 'heal' ? 'heal' : 'attack');
         if (e.isSpell) {
           shake(this, 0.004, 120);
           this.spellFlash(e.side, this.sim.fighters[e.side].spells[e.index].def);
@@ -469,6 +545,7 @@ export class ArenaScene extends Phaser.Scene {
             color: e.shielded ? 0x8cc8ff : big ? PALT.gold : toHuman ? 0xff7a6a : PALT.cream, crit: big, depth: 2600,
           });
           flashWhite(v.sprite, big ? 110 : 70);
+          sfx.play(big ? 'crit' : 'hit');
           v.hitUntil = this.realNow + (big ? 200 : 120);
           v.ghostHoldUntil = this.realNow + 350;
           burst(this, x, y + 6, { count: big ? 16 : 8, texture: 'px-spark', speed: big ? 110 : 70, colors: [PALT.white, big ? PALT.gold : PALT.orange, PALT.cream], depth: 2400 });
@@ -517,6 +594,7 @@ export class ArenaScene extends Phaser.Scene {
         v.sprite.play(v.info.anims.ko, true);
         v.anim = v.info.anims.ko;
         v.koShown = true;
+        sfx.play('ko');
         burst(this, this.sx(f.x), this.sy(f.y) - v.info.size / 2, { count: 26, texture: 'px-star', colors: [PALT.white, PALT.gold, PALT.red], speed: 140, depth: 2500 });
         shake(this, 0.014, 260);
         this.freezeMs = Math.max(this.freezeMs, 140);
@@ -564,8 +642,10 @@ export class ArenaScene extends Phaser.Scene {
       v.sprite.setFlipX(f.facing === -1);
       // crouch on dash wind-up / channel
       const act = f.action;
-      const crouch = act && ((act.kind === 'dash' && sim.t < act.lungeAt) || act.kind === 'channel');
+      const crouch = act && ((act.kind === 'dash' && sim.t < act.lungeAt) || act.kind === 'channel' || act.kind === 'melee');
       v.sprite.setScale(crouch ? 1.08 : 1, crouch ? 0.9 : 1);
+      // whiff recovery: off-balance wobble (punish window)
+      v.sprite.setAngle(act?.kind === 'recover' ? Math.sin(this.realNow / 40) * 7 : 0);
       // dash afterimages
       if (act?.kind === 'dash' && sim.t >= act.lungeAt && this.realNow - v.lastGhostAt > 30) {
         v.lastGhostAt = this.realNow;
@@ -669,6 +749,23 @@ export class ArenaScene extends Phaser.Scene {
         g.lineStyle(3, v.side === this.human ? 0x8cc8ff : 0xff6a5a, 0.5);
         g.lineBetween(x, y, x + (act.vx / l) * len, y + (act.vy / l) * len);
       }
+      // locked melee strike tell: the capsule that will be hit, filling up until the strike lands
+      if (act?.kind === 'melee' && sim.t < act.strikeAt) {
+        const S = TUNING.arena.sim;
+        const prog = Phaser.Math.Clamp((sim.t - act.start) / Math.max(0.01, act.strikeAt - act.start), 0, 1);
+        const len = act.reach + S.meleeReachSlack + 8;
+        const hw = act.halfWidth + 6;
+        const px = -act.dy, py = act.dx;
+        const ox = this.sx(act.ox), oy = this.sy(act.oy);
+        const quad = (l: number) => [
+          { x: ox + px * hw, y: oy + py * hw }, { x: ox + act.dx * l + px * hw, y: oy + act.dy * l + py * hw },
+          { x: ox + act.dx * l - px * hw, y: oy + act.dy * l - py * hw }, { x: ox - px * hw, y: oy - py * hw },
+        ];
+        const col = v.side === this.human ? 0x8cc8ff : 0xff5a4a;
+        g.fillStyle(col, 0.14).fillPoints(quad(len), true);
+        g.fillStyle(col, 0.18 + 0.3 * prog).fillPoints(quad(len * prog), true);
+        g.lineStyle(1, col, 0.55 + 0.45 * Math.sin(this.realNow / 30) ** 2).strokePoints(quad(len), true);
+      }
     }
   }
 
@@ -698,67 +795,85 @@ export class ArenaScene extends Phaser.Scene {
     g.lineStyle(2, 0xff5a5a, 0.7 + 0.3 * Math.sin(this.realNow / 60)).strokeRect(bx0, by0, bx1 - bx0, by1 - by0);
   }
 
+  // Phaser re-tessellates a Graphics' whole command list on every render (rounded rects, circles,
+  // cooldown slices), which was the main per-frame cost on throttled phones. The HUD and the
+  // ability buttons are therefore drawn into off-screen Graphics and baked into RenderTextures,
+  // only when a quantised state signature changes; each frame then just draws two quads.
+  private hudSig = '';
+  private btnSig = '';
+
   private drawHud(): void {
-    const g = this.hud;
-    g.clear();
     const sim = this.sim;
-    for (const side of [this.human, this.npc] as Side[]) {
+    // timer (BitmapText.setText is a no-op when unchanged)
+    const t = sim.t;
+    const sd = TUNING.arena.suddenDeathAtSec;
+    let txt: string, tcol: number;
+    if (t < sd) { txt = String(Math.ceil(sd - t)); tcol = sd - t <= 5 ? 0xf08a3a : PALT.cream; }
+    else { txt = String(Math.max(0, Math.ceil(TUNING.arena.hardCapSec - t))); tcol = 0xff5a5a; }
+    setPixelText(this.timerText, txt);
+    this.timerText.setTint(tcol);
+    const showPills = this.phase === 'fight' || this.phase === 'intro';
+    this.autoBtn.visible = showPills; this.skipBtn.visible = showPills; this.pauseBtn.visible = showPills;
+    this.autoText.setVisible(true);
+
+    const bw = 146;
+    const state = ([this.human, this.npc] as Side[]).map((side) => {
       const f = sim.fighters[side];
       const v = this.views[side];
-      const left = side === this.human;
+      return {
+        side,
+        fw: Math.round(bw * (Math.max(0, f.hp) / f.maxHp)),
+        gw: Math.round(bw * (Math.max(0, v.ghostHp) / f.maxHp)),
+        frac: Math.max(0, f.hp) / f.maxHp,
+        sh: sim.isShielded(side), bf: sim.isBuffed(side), st: sim.isStunned(side),
+      };
+    });
+    const sig = `${state.map((x) => `${x.fw},${x.gw},${+x.sh}${+x.bf}${+x.st}`).join('|')}|${+showPills}${+this.auto}`;
+    if (sig === this.hudSig) return;
+    this.hudSig = sig;
+
+    const g = this.hud;
+    g.clear();
+    for (const st of state) {
+      const left = st.side === this.human;
       const pw = 158, ph = 42;
       const px = left ? 3 : W - 3 - pw;
       g.fillStyle(0x140c1c, 0.75).fillRoundedRect(px, 2, pw, ph, 4);
       g.lineStyle(1, left ? 0x3b8fe0 : 0xe4433c, 0.9).strokeRoundedRect(px, 2, pw, ph, 4);
       // HP bar
-      const bw = 146, bh = 7, bx = left ? px + 6 : px + pw - 6 - bw, by = 16;
-      const frac = Math.max(0, f.hp) / f.maxHp;
-      const ghost = Math.max(0, v.ghostHp) / f.maxHp;
+      const bh = 7, bx = left ? px + 6 : px + pw - 6 - bw, by = 16;
       g.fillStyle(0x2c2140, 1).fillRect(bx - 1, by - 1, bw + 2, bh + 2);
       g.fillStyle(0xffffff, 0.8);
-      if (left) g.fillRect(bx, by, Math.round(bw * ghost), bh); else g.fillRect(bx + bw - Math.round(bw * ghost), by, Math.round(bw * ghost), bh);
-      const col = frac > 0.5 ? 0x5fbf4a : frac > 0.25 ? 0xf2b33d : 0xe4433c;
+      if (left) g.fillRect(bx, by, st.gw, bh); else g.fillRect(bx + bw - st.gw, by, st.gw, bh);
+      const col = st.frac > 0.5 ? 0x5fbf4a : st.frac > 0.25 ? 0xf2b33d : 0xe4433c;
       g.fillStyle(col, 1);
-      const fw = Math.round(bw * frac);
-      if (left) g.fillRect(bx, by, fw, bh); else g.fillRect(bx + bw - fw, by, fw, bh);
+      if (left) g.fillRect(bx, by, st.fw, bh); else g.fillRect(bx + bw - st.fw, by, st.fw, bh);
       g.fillStyle(0xffffff, 0.25);
-      if (left) g.fillRect(bx, by, fw, 2); else g.fillRect(bx + bw - fw, by, fw, 2);
+      if (left) g.fillRect(bx, by, st.fw, 2); else g.fillRect(bx + bw - st.fw, by, st.fw, 2);
       // shield / buff / stun pips
       let ix = left ? px + pw - 10 : px + 6;
       const pip = (c: number) => { g.fillStyle(c, 1).fillRect(ix, 37, 5, 5); ix += left ? -7 : 7; };
-      if (sim.isShielded(side)) pip(0x8cc8ff);
-      if (sim.isBuffed(side)) pip(0xf08a3a);
-      if (sim.isStunned(side)) pip(0xf4dc6a);
+      if (st.sh) pip(0x8cc8ff);
+      if (st.bf) pip(0xf08a3a);
+      if (st.st) pip(0xf4dc6a);
     }
-    // timer
-    const t = sim.t;
-    const sd = TUNING.arena.suddenDeathAtSec;
-    let txt: string, col: number;
-    if (t < sd) { txt = String(Math.ceil(sd - t)); col = sd - t <= 5 ? 0xf08a3a : PALT.cream; }
-    else { txt = String(Math.max(0, Math.ceil(TUNING.arena.hardCapSec - t))); col = 0xff5a5a; }
-    setPixelText(this.timerText, txt);
-    this.timerText.setTint(col);
-    // AUTO / SKIP pills
+    // AUTO / SKIP / pause pills
     const pill = (b: TouchButton, on: boolean) => {
       const o = b.opts;
       const w = o.width ?? 30, h = o.height ?? 11;
       g.fillStyle(on ? 0x5fbf4a : 0x2c2140, 0.95).fillRoundedRect(o.x - w / 2, o.y - h / 2, w, h, 3);
       g.lineStyle(1, on ? 0xb8f0a0 : 0x5a4a7a, 1).strokeRoundedRect(o.x - w / 2, o.y - h / 2, w, h, 3);
     };
-    const showPills = this.phase === 'fight' || this.phase === 'intro';
-    this.autoBtn.visible = showPills; this.skipBtn.visible = showPills;
-    this.autoText.setVisible(true);
-    if (showPills) { pill(this.autoBtn, this.auto); pill(this.skipBtn, false); }
+    if (showPills) { pill(this.autoBtn, this.auto); pill(this.skipBtn, false); pill(this.pauseBtn, false); }
+    this.hudRT.clear().draw(g);
   }
 
   private drawButtons(): void {
-    const g = this.ui;
-    g.clear();
     const sim = this.sim;
     const me = sim.fighters[this.human];
     const fighting = this.phase === 'fight';
-    for (const b of this.abilityButtons) {
-      const o = b.btn.opts;
+    const alpha = this.auto ? 0.45 : 1;
+    const states = this.abilityButtons.map((b) => {
       let frac = 0, ready = false, cdLeft = 0, gone = false;
       if (b.kind === 'ability') {
         const slot = me.abilities[b.index];
@@ -766,38 +881,50 @@ export class ArenaScene extends Phaser.Scene {
         cdLeft = slot.cd;
         ready = sim.canUseAbility(this.human, b.index);
       } else {
-        const s = me.spells[b.index];
-        gone = s.used;
+        const sp = me.spells[b.index];
+        gone = sp.used;
         ready = sim.canUseSpell(this.human, b.index);
       }
       b.btn.visible = !gone;
       b.btn.enabled = fighting && !this.auto;
       b.icon.setVisible(!gone); b.key.setVisible(!gone); b.cdText.setVisible(!gone);
       b.name?.setVisible(!gone);
+      if (!gone) {
+        b.icon.setAlpha(ready ? alpha : 0.5 * alpha);
+        setPixelText(b.cdText, b.btn.opts.radius !== undefined && cdLeft > 0 ? String(Math.ceil(cdLeft)) : '');
+      }
+      const period = b.btn.opts.radius !== undefined ? 140 : 120;
+      // glow quantised to 5 steps, cooldown sweep to 48 steps
+      const glow = ready && fighting ? Math.round((0.5 + 0.5 * Math.sin(this.realNow / period)) * 4) / 4 : 0;
+      return { b, gone, glow, q: Math.ceil(frac * 48) };
+    });
+    const sig = `${alpha}|` + states.map((x) => (x.gone ? 'x' : `${x.glow},${x.q}`)).join('|');
+    if (sig === this.btnSig) return;
+    this.btnSig = sig;
+
+    const g = this.ui;
+    g.clear();
+    for (const { b, gone, glow, q } of states) {
       if (gone) continue;
-      const alpha = this.auto ? 0.45 : 1;
-      b.icon.setAlpha(ready ? alpha : 0.5 * alpha);
+      const o = b.btn.opts;
       if (o.radius !== undefined) {
         const r = o.radius;
-        const glow = ready && fighting ? 0.5 + 0.5 * Math.sin(this.realNow / 140) : 0;
         g.fillStyle(0x140c1c, 0.75 * alpha).fillCircle(o.x, o.y, r + 2);
         g.fillStyle(0x2c2140, 0.95 * alpha).fillCircle(o.x, o.y, r);
         g.lineStyle(2, KIND_COLOR[b.ab.kind], (0.55 + 0.45 * glow) * alpha).strokeCircle(o.x, o.y, r);
-        if (frac > 0) {
+        if (q > 0) {
           g.fillStyle(0x000000, 0.55);
-          g.slice(o.x, o.y, r, Phaser.Math.DegToRad(-90), Phaser.Math.DegToRad(-90 + 360 * frac), false);
+          g.slice(o.x, o.y, r, Phaser.Math.DegToRad(-90), Phaser.Math.DegToRad(-90 + 360 * (q / 48)), false);
           g.fillPath();
         }
-        setPixelText(b.cdText, cdLeft > 0 ? String(Math.ceil(cdLeft)) : '');
       } else {
         const w = o.width ?? 18, h = o.height ?? 24;
-        const glow = ready && fighting ? 0.5 + 0.5 * Math.sin(this.realNow / 120) : 0;
         g.fillStyle(0x140c1c, 0.8 * alpha).fillRoundedRect(o.x - w / 2 - 1, o.y - h / 2 - 1, w + 2, h + 2, 3);
         g.fillStyle(0x2a9a84, alpha).fillRoundedRect(o.x - w / 2, o.y - h / 2, w, h, 2);
         g.lineStyle(2, 0xffb347, (0.6 + 0.4 * glow) * alpha).strokeRoundedRect(o.x - w / 2, o.y - h / 2, w, h, 2);
-        setPixelText(b.cdText, '');
       }
     }
+    this.uiRT.clear().draw(g);
   }
 
   // ---------------------------------------------------------------------------
@@ -827,6 +954,7 @@ export class ArenaScene extends Phaser.Scene {
       : `${fitText(this.sim.fighters[winnerSide].def.name, 'tiny', 240)} WINS - ${hp}% HP LEFT`;
     const s = pixelText(this, W / 2, 132, sub, 1, PALT.cream, { tiny: true, originX: 0.5, originY: 0.5 }).setDepth(5802);
     this.outroObjs = [shade, band, t, s];
+    sfx.play(humanWon ? 'victory' : r.winner === 'draw' ? 'lp' : 'defeat');
     if (humanWon) burst(this, W / 2, 110, { count: 30, texture: 'px-star', colors: [PALT.gold, PALT.white, PALT.orange], speed: 160, depth: 5803 });
   }
 
