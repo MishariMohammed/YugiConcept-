@@ -5,6 +5,7 @@ import { DuelScene } from './scenes/DuelScene';
 import { ArenaScene } from './scenes/ArenaScene';
 import { ResultScene } from './scenes/ResultScene';
 import { ArtGalleryScene } from './scenes/ArtGalleryScene';
+import { installMobile } from './mobile';
 
 export const GAME_WIDTH = 480;
 export const GAME_HEIGHT = 270;
@@ -17,21 +18,23 @@ const config: Phaser.Types.Core.GameConfig = {
   backgroundColor: '#1a1423',
   pixelArt: true,
   roundPixels: true,
+  // FIT letterboxes the fixed 16:9 canvas inside #game, which index.html shrinks to the
+  // notch-free safe area; on 18:9-20:9 phones the spare width becomes side pillars.
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
     width: GAME_WIDTH,
     height: GAME_HEIGHT,
   },
-  input: { activePointers: 3 },
+  // 3 touch points: joystick thumb + 2 ability/spell taps at once.
+  input: { activePointers: 3, touch: { capture: true } },
+  disableContextMenu: true,
   scene: [BootScene, TitleScene, DuelScene, ArenaScene, ResultScene, ArtGalleryScene],
 };
 
 const game = new Phaser.Game(config);
-// Lock to landscape where supported (Android/Capacitor); ignore failures on desktop.
-try {
-  (screen.orientation as unknown as { lock?: (o: string) => Promise<void> }).lock?.('landscape')?.catch(() => {});
-} catch { /* not supported */ }
+// Gestures, pause-on-background, Android back button, fullscreen/landscape, audio unlock.
+installMobile(game);
 
 export default game;
 

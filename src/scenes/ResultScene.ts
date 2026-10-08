@@ -5,6 +5,7 @@ import { pixelText } from '../ui/PixelText';
 import { PixelButton, panelTexture } from '../ui/Widgets';
 import { burst, ensureFxTextures } from '../fx/Juice';
 import { PALT } from '../fx/art/Palette';
+import { sfx } from '../fx/Sfx';
 
 /** Extra fields the DuelScene passes along (optional so the base contract still works). */
 export interface ResultStats {
@@ -28,6 +29,7 @@ export class ResultScene extends Phaser.Scene {
     const color = draw ? PALT.cream : won ? PALT.gold : PALT.red;
     const t = pixelText(this, W / 2, 48, title, 4, color, { originX: 0.5, originY: 0.5 }).setScale(0.2);
     this.tweens.add({ targets: t, scale: 1, duration: 420, ease: 'Back.Out' });
+    sfx.play(won ? 'victory' : 'defeat');
     if (won) {
       this.time.addEvent({ delay: 350, repeat: 5, callback: () => burst(this, Phaser.Math.Between(80, W - 80), Phaser.Math.Between(30, 90), {
         count: 18, texture: 'px-star', colors: [PALT.gold, PALT.cream, PALT.orange], speed: 110, gravity: 120, lifespan: 800,

@@ -15,6 +15,8 @@ import { pickCards, type PickItem } from '../ui/CardPicker';
 import { burst, damageNumber, ensureFxTextures, flashWhite, ring, shake } from '../fx/Juice';
 import { fitText } from '../fx/art/PixelFont';
 import { PALT } from '../fx/art/Palette';
+import { sfx } from '../fx/Sfx';
+import { PAUSE_EVENT } from '../mobile';
 
 const HUMAN: PlayerId = 0;
 const NPC: PlayerId = 1;
@@ -82,6 +84,8 @@ export class DuelScene extends Phaser.Scene {
   private zoneGfx!: Phaser.GameObjects.Graphics;
   /** effective ATK/DEF chips under field monsters (printed stats are unreadable at field scale) */
   private chips = new Map<number, Phaser.GameObjects.BitmapText>();
+  /** pause menu currently open */
+  private paused = false;
 
   constructor() { super(SCENES.Duel); }
 
@@ -99,6 +103,8 @@ export class DuelScene extends Phaser.Scene {
       // The NPC decides when its own Set traps fire; the human's traps always fire (for now).
       trapPolicy: makeTrapPolicy(() => this.engine, NPC, this.difficulty),
     });
+    // Scene instances are reused by Phaser: AUTO must not leak into the next duel (rematch / new game).
+    this.autoplay = false;
     this.views = new Map();
     this.selected = null;
     this.mode = { kind: 'idle' };
@@ -114,7 +120,14 @@ export class DuelScene extends Phaser.Scene {
     this.chips = new Map();
     ensureFxTextures(this);
     this.events.on(Phaser.Scenes.Events.UPDATE, this.updateChips, this);
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.events.off(Phaser.Scenes.Events.UPDATE, this.updateChips, this));
+    this.paused = false;
+    // App backgrounded / tab hidden / Android back button -> open the pause menu.
+    const onPause = () => this.onExternalPause();
+    this.game.events.on(PAUSE_EVENT, onPause);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.events.off(Phaser.Scenes.Events.UPDATE, this.updateChips, this);
+      this.game.events.off(PAUSE_EVENT, onPause);
+    });
 
     this.buildChrome(data);
     // Hold to fast-forward animations (2x).
@@ -174,7 +187,10 @@ export class DuelScene extends Phaser.Scene {
       this.refreshUI();
       // ArenaScene also reads optional `difficulty` / `auto` (AUTO toggle carries into fights).
       const arenaData = { request: e.pendingArena, humanPlayer: HUMAN, difficulty: this.difficulty, auto: this.autoplay };
+      // The arena is opaque: stop drawing the board underneath it (saves a full frame of fill).
+      this.scene.setVisible(false);
       runArena(this, arenaData).then(async (result) => {
+        this.scene.setVisible(true);
         const evs = e.resolveArena(result);
         await this.play(evs);
         this.busy = false;
@@ -475,6 +491,7 @@ export class DuelScene extends Phaser.Scene {
             onComplete: () => { if (!t.faceDown && v.faceDown) v.flip(false); v.setDepth(t.depth); } });
         }
         this.updatePiles();
+        sfx.play('draw');
         await this.wait(opening ? 55 : 110);
         return;
       }
@@ -496,6 +513,7 @@ export class DuelScene extends Phaser.Scene {
           v.setDepth(t.depth);
         }
         v.playSummonBounce();
+        sfx.play('summon');
         shake(this, 0.004, 100);
         await this.wait(260);
         return;
@@ -508,6 +526,7 @@ export class DuelScene extends Phaser.Scene {
         v.face.setTint(t.dim ? 0x8a80a8 : 0xffffff);
         await new Promise<void>((res) => this.tweens.add({ targets: v, x: t.x, y: t.y, scale: t.scale, angle: t.angle, duration: 200, ease: 'Cubic.Out', onComplete: () => res() }));
         ring(this, t.x, t.y, PALT.violet, 2, 200);
+        sfx.play('set');
         await this.wait(60);
         return;
       }
@@ -519,6 +538,7 @@ export class DuelScene extends Phaser.Scene {
         if (v.faceDown) v.setFaceDown(false);
         v.face.setTint(0xffffff);
         flashWhite(v.face, 90);
+        sfx.play('destroy');
         v.shake(3);
         burst(this, v.x, v.y, { count: 14, texture: 'px-spark', colors: [PALT.white, PALT.red, PALT.orange], speed: 100 });
         shake(this, 0.005, 120);
@@ -543,6 +563,7 @@ export class DuelScene extends Phaser.Scene {
           prefix: ev.delta < 0 ? '-' : '+', color: ev.delta < 0 ? PALT.red : PALT.green, crit: Math.abs(ev.delta) >= 1000, depth: 3000,
         });
         if (ev.delta < 0) shake(this, Math.min(0.012, 0.003 + -ev.delta / 200000), 160);
+        sfx.play(ev.delta < 0 ? 'lp' : 'heal');
         if (ev.player === HUMAN && ev.lp <= 1000) this.bg.setColors(SWIRL_PRESETS.defeat);
         await Promise.race([bar.setLP(ev.lp, 450), this.wait(320)]);
         return;
@@ -566,6 +587,7 @@ export class DuelScene extends Phaser.Scene {
         a.setHighlight(PALT.red);
         tv?.setHighlight(PALT.red);
         const sx = a.x, sy = a.y;
+        sfx.play('attack');
         await new Promise<void>((res) => this.tweens.add({
           targets: a, x: sx + (tx - sx) * 0.45, y: sy + (ty - sy) * 0.45, duration: 130, ease: 'Quad.In', yoyo: true,
           onYoyo: () => { if (tv) { flashWhite(tv.face, 80); tv.shake(2); } shake(this, 0.004, 90); },
@@ -634,6 +656,7 @@ export class DuelScene extends Phaser.Scene {
     await new Promise<void>((res) => this.tweens.add({ targets: v, x: BOARD_CX, y: ROW.mid - 4, scale: 1, angle: 0, duration: 180, ease: 'Cubic.Out', onComplete: () => res() }));
     if (v.faceDown) await v.flip(false);
     ring(this, v.x, v.y, isTrap ? PALT.red : PALT.gold, 4, 280);
+    sfx.play('spell');
     burst(this, v.x, v.y, { count: 10, texture: 'px-star', colors: [PALT.gold, PALT.cream], speed: 80, gravity: 0, lifespan: 400 });
     this.tweens.add({ targets: name, alpha: 1, duration: 100 });
     if (isTrap) {
@@ -960,24 +983,42 @@ export class DuelScene extends Phaser.Scene {
     }).then(() => { this.busy = false; this.refreshUI(); });
   }
 
+  /** PAUSE_EVENT from mobile.ts (backgrounded / back button). Ignored while the arena owns the screen. */
+  private onExternalPause(): void {
+    if (this.paused || this.ended || !this.sys.isActive() || this.scene.isActive(SCENES.Arena)) return;
+    this.openPause();
+  }
+
   private openPause(): void {
-    if (this.ended) return;
+    // Taps on the arena overlay fall through to this (hidden) scene: never pause underneath a fight.
+    if (this.ended || this.paused || this.scene.isActive(SCENES.Arena)) return;
+    this.paused = true;
     const W = this.scale.width, H = this.scale.height;
     const objs: Phaser.GameObjects.GameObject[] = [];
     const wasBusy = this.busy;
     this.busy = true;
+    this.setFast(false);
     objs.push(dimmer(this, 0.75, 5000));
-    objs.push(this.add.image(W / 2, H / 2, panelTexture(this, 150, 150)).setDepth(5001));
-    objs.push(pixelText(this, W / 2, H / 2 - 62, 'PAUSED', 2, PALT.gold, { originX: 0.5 }).setDepth(5002));
+    objs.push(this.add.image(W / 2, H / 2, panelTexture(this, 150, 180)).setDepth(5001));
+    objs.push(pixelText(this, W / 2, H / 2 - 78, 'PAUSED', 2, PALT.gold, { originX: 0.5 }).setDepth(5002));
     this.tweens.pauseAll();
     this.time.paused = true;
-    const close = () => { objs.forEach((o) => o.destroy()); this.tweens.resumeAll(); this.time.paused = false; this.busy = wasBusy; this.refreshUI(); };
-    const btn = (y: number, t: string, c: number, fn: () => void) => objs.push(new PixelButton(this, W / 2, y, 120, 24, t, c, fn).setDepth(5003));
-    btn(H / 2 - 28, 'RESUME', PALT.blue, close);
-    btn(H / 2 + 2, this.autoplay ? 'AUTO: ON' : 'AUTO: OFF', PALT.violet, () => {
+    const unpause = () => { this.tweens.resumeAll(); this.time.paused = false; this.paused = false; };
+    const close = () => { objs.forEach((o) => o.destroy()); unpause(); this.busy = wasBusy; this.refreshUI(); };
+    const btn = (y: number, t: string, c: number, fn: () => void) => {
+      const b = new PixelButton(this, W / 2, y, 120, 24, t, c, fn).setDepth(5003);
+      objs.push(b);
+      return b;
+    };
+    btn(H / 2 - 46, 'RESUME', PALT.blue, close);
+    btn(H / 2 - 18, this.autoplay ? 'AUTO: ON' : 'AUTO: OFF', PALT.violet, () => {
       this.autoplay = !this.autoplay; close(); if (!this.busy && !this.animating) this.afterChange();
     });
-    btn(H / 2 + 32, 'RESTART', PALT.orange, () => { this.tweens.resumeAll(); this.time.paused = false; this.scene.restart({ ...this.data0, seed: Date.now() & 0x7fffffff }); });
-    btn(H / 2 + 62, 'QUIT', PALT.redDark, () => { this.tweens.resumeAll(); this.time.paused = false; this.scene.start(SCENES.Title); });
+    const snd = btn(H / 2 + 10, sfx.muted ? 'SOUND: OFF' : 'SOUND: ON', PALT.green, () => {
+      sfx.unlock();
+      snd.setText(sfx.toggleMute() ? 'SOUND: OFF' : 'SOUND: ON');
+    });
+    btn(H / 2 + 38, 'RESTART', PALT.orange, () => { unpause(); this.scene.restart({ ...this.data0, seed: Date.now() & 0x7fffffff }); });
+    btn(H / 2 + 66, 'QUIT', PALT.redDark, () => { unpause(); this.scene.start(SCENES.Title); });
   }
 }

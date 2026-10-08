@@ -3,8 +3,52 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#1a1423" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="format-detection" content="telephone=no" />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="icon" type="image/png" href="./favicon.png" />
+  <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
   <title>YugiConcept</title>
-  <style>html,body{margin:0;height:100%;background:#1a1423;overflow:hidden;touch-action:none}#game{width:100vw;height:100vh}</style>
+  <style>
+    :root {
+      /* Notch / cutout safe areas. Capacitor 8 (SystemBars) injects --safe-area-inset-*,
+         browsers expose env(). Use whichever is larger. */
+      --sat: max(env(safe-area-inset-top, 0px), var(--safe-area-inset-top, 0px));
+      --sar: max(env(safe-area-inset-right, 0px), var(--safe-area-inset-right, 0px));
+      --sab: max(env(safe-area-inset-bottom, 0px), var(--safe-area-inset-bottom, 0px));
+      --sal: max(env(safe-area-inset-left, 0px), var(--safe-area-inset-left, 0px));
+    }
+    html, body {
+      margin: 0; width: 100%; height: 100%; overflow: hidden; background: #1a1423;
+      touch-action: none; overscroll-behavior: none;
+      -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #game { position: fixed; top: var(--sat); right: var(--sar); bottom: var(--sab); left: var(--sal); }
+    #game canvas { touch-action: none; outline: none; }
+    #rotate {
+      display: none; position: fixed; inset: 0; z-index: 10; background: #1a1423; color: #f4ead2;
+      font: bold 16px/1.4 monospace; text-align: center; flex-direction: column; align-items: center;
+      justify-content: center; gap: 18px; letter-spacing: 1px;
+    }
+    #rotate .phone {
+      width: 34px; height: 60px; border: 4px solid #f2b33d; border-radius: 6px; box-sizing: border-box;
+      animation: yc-rot 1.6s ease-in-out infinite; image-rendering: pixelated;
+    }
+    #rotate small { color: #8a7aa8; font-size: 11px; }
+    @keyframes yc-rot { 0%, 25% { transform: rotate(0deg); } 60%, 100% { transform: rotate(-90deg); } }
+    /* Phones/tablets held upright: ask for landscape (the game is a fixed 16:9 landscape canvas). */
+    @media (orientation: portrait) and (pointer: coarse) {
+      #rotate { display: flex; }
+    }
+  </style>
 </head>
-<body><div id="game"></div><script type="module" src="/src/main.ts"></script></body>
+<body>
+  <div id="game"></div>
+  <div id="rotate" aria-live="polite"><div class="phone"></div><div>ROTATE YOUR PHONE</div><small>YugiConcept plays in landscape</small></div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
 </html>

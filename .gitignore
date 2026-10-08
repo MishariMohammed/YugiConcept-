@@ -2,3 +2,14 @@ node_modules/
 dist/
 android/app/build/
 .DS_Store
+# Android / Capacitor build outputs (android/.gitignore covers the rest)
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.idea/
+android/app/src/main/assets/public/
+*.apk
+*.aab
+# QA artefacts
+tests/e2e/out/

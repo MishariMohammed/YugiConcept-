@@ -5,6 +5,7 @@ import Phaser from 'phaser';
 import { PixelCanvas, ensureTexture, hex, mix, shift, toTint, withAlpha } from '../fx/art/PixelCanvas';
 import { PAL, PALT } from '../fx/art/Palette';
 import { pixelText, setPixelText } from './PixelText';
+import { sfx } from '../fx/Sfx';
 
 const INK = hex(PAL.ink);
 
@@ -70,6 +71,7 @@ export class PixelButton extends Phaser.GameObjects.Container {
     this.on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => {
       if (!this.enabled || !this.pressed) return;
       this.press(false);
+      sfx.play('click');
       this.onTap();
     });
     this.on(Phaser.Input.Events.GAMEOBJECT_POINTER_OVER, () => { if (this.enabled) this.bg.setTint(0xffffff).setScale(1.04); });
