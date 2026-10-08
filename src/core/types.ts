@@ -116,6 +116,8 @@ export interface DuelState {
   winner: PlayerId | null | 'draw';
   log: string[];
   nextUid: number;
+  /** [engine addition] mulberry32 RNG state so a cloned state replays deterministically. */
+  rngState?: number;
 }
 
 /** Actions a player (human UI or AI) can submit to the duel engine. */
@@ -127,7 +129,8 @@ export type DuelAction =
   | { type: 'changePosition'; uid: number }
   | { type: 'enterBattle' }
   | { type: 'declareAttack'; attackerUid: number; targetUid: number | null } // null = direct
-  | { type: 'endTurn' };
+  /** [engine addition] discardUids: cards to discard for the hand limit (else the engine discards highest-index cards). */
+  | { type: 'endTurn'; discardUids?: number[] };
 
 /** Request emitted by the duel engine when an attack must be resolved in the arena. */
 export interface ArenaRequest {
@@ -152,8 +155,17 @@ export type DuelEvent =
   | { type: 'log'; text: string }
   | { type: 'draw'; player: PlayerId; uid: number }
   | { type: 'summon'; player: PlayerId; uid: number }
-  | { type: 'destroy'; player: PlayerId; uid: number }
+  /** [engine addition] reason is optional. */
+  | { type: 'destroy'; player: PlayerId; uid: number; reason?: 'battle' | 'effect' }
   | { type: 'lp'; player: PlayerId; delta: number; lp: number }
   | { type: 'phase'; phase: Phase; player: PlayerId }
   | { type: 'arena'; request: ArenaRequest }
-  | { type: 'gameOver'; winner: PlayerId | 'draw' };
+  | { type: 'gameOver'; winner: PlayerId | 'draw' }
+  // [engine additions] extra events for the UI layer:
+  | { type: 'activate'; player: PlayerId; uid: number; defId: string }
+  | { type: 'set'; player: PlayerId; uid: number }
+  | { type: 'position'; player: PlayerId; uid: number; position: Position; faceDown: boolean }
+  | { type: 'attack'; player: PlayerId; attackerUid: number; targetUid: number | null }
+  | { type: 'attackNegated'; player: PlayerId; attackerUid: number }
+  | { type: 'toGraveyard'; player: PlayerId; uid: number; from: 'hand' | 'field' | 'deck' }
+  | { type: 'arenaResolved'; result: ArenaResult; attackerDestroyed: boolean; defenderDestroyed: boolean };
