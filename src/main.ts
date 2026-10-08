@@ -4,6 +4,7 @@ import { TitleScene } from './scenes/TitleScene';
 import { DuelScene } from './scenes/DuelScene';
 import { ArenaScene } from './scenes/ArenaScene';
 import { ResultScene } from './scenes/ResultScene';
+import { ArtGalleryScene } from './scenes/ArtGalleryScene';
 
 export const GAME_WIDTH = 480;
 export const GAME_HEIGHT = 270;
@@ -23,7 +24,7 @@ const config: Phaser.Types.Core.GameConfig = {
     height: GAME_HEIGHT,
   },
   input: { activePointers: 3 },
-  scene: [BootScene, TitleScene, DuelScene, ArenaScene, ResultScene],
+  scene: [BootScene, TitleScene, DuelScene, ArenaScene, ResultScene, ArtGalleryScene],
 };
 
 const game = new Phaser.Game(config);

@@ -8,8 +8,8 @@ export default defineConfig({
     assetsInlineLimit: 0,
     rollupOptions: {
       input: {
-        main: resolve(__dirname, 'index.html'),
-        art: resolve(__dirname, 'art.html'),
+        main: resolve(import.meta.dirname, 'index.html'),
+        art: resolve(import.meta.dirname, 'art.html'),
       },
     },
   },
